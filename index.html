@@ -243,7 +243,13 @@
     let activeTab = 'calendar';
 
     const STATUSES = ['Čaká na spracovanie', 'Rozpracované', 'Dokončené'];
-    const TIME_OPTIONS = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'];
+    
+    // Polhodinové intervaly pre presné plánovanie
+    const TIME_OPTIONS = [
+      '07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', 
+      '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', 
+      '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00'
+    ];
 
     const $ = id => document.getElementById(id);
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -774,7 +780,7 @@
           </div>
 
           <div><label>Stav</label><select id="jStatus">${STATUSES.map(s => `<option ${j.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
-          <div><label>Čas od - do</label>
+          <div><label>Čas od - do (polhodinové intervaly)</label>
             <div style="display:flex;gap:6px">
               <select id="jStart">${startOpts}</select>
               <select id="jEnd">${endOpts}</select>
