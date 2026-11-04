@@ -116,7 +116,7 @@
     <div class="headrow">
       <div>
         <h1 id="pageTitle">Prehľad dielne</h1>
-        <div class="muted" id="pageSub">Týždenný plán zákaziek celej dielne</div>
+        <div class="muted" id="pageSub">Správa a plánovanie servisu</div>
       </div>
       <div class="toolbar" id="topActionsBar">
         <button class="btn admin-only" onclick="openJob()">+ Naplánovať auto</button>
@@ -126,15 +126,15 @@
     </div>
 
     <div class="tabs" id="tabs">
-      <button class="tab active" data-tab="calendar" onclick="showTab('calendar')">Kalendár dielne</button>
+      <button class="tab admin-only active" data-tab="calendar" onclick="showTab('calendar')">Kalendár dielne</button>
       <button class="tab" data-tab="tires" onclick="showTab('tires')">Sklad pneu</button>
       <button class="tab admin-only" data-tab="vehicles" onclick="showTab('vehicles')">Vozidlá</button>
       <button class="tab admin-only" data-tab="mechanics" onclick="showTab('mechanics')">Mechanici</button>
       <button class="tab" data-tab="password" onclick="showTab('password')">Zmena hesla</button>
     </div>
 
-    <!-- TAB: KALENDÁR -->
-    <div id="calendarTab">
+    <!-- TAB: KALENDÁR (Viditeľný iba pre Admina) -->
+    <div id="calendarTab" class="admin-only">
       <div class="stats">
         <div class="panel stat"><div class="num" id="statJobs">0</div><div class="caption">Zákazky v tomto týždni</div></div>
         <div class="panel stat"><div class="num" id="statMechanics">0</div><div class="caption">Aktívni mechanici</div></div>
@@ -279,18 +279,23 @@
           el.classList.toggle('hidden', !isAdmin);
         });
 
+        // Ak je prihlásený mechanik a práve bol na kalendári, prepneme ho automaticky na Sklad pneu
+        if (!isAdmin && activeTab === 'calendar') {
+          showTab('tires');
+        }
+
         renderAll();
       } catch(e) {
         $('loginError').textContent = e.message;
         token = '';
         sessionStorage.removeItem('as_token');
-        $('loginView').classList.remove('hidden');
+        $('loginView').classList.add('hidden');
         $('appView').classList.add('hidden');
       }
     }
 
     function renderAll() {
-      renderCalendar();
+      if (me.role === 'admin') renderCalendar();
       renderTires();
       renderVehicles();
       renderMechanics();
@@ -337,11 +342,11 @@
     function mechanic(id) { return data.mechanics.find(m => m.id === id) || {}; }
 
     function renderCalendar() {
+      if (me.role !== 'admin') return;
       const days = Array.from({length:7}, (_,i) => plusDays(weekStart, i));
       const end = plusDays(weekStart, 6);
       $('weekLabel').textContent = fmt(weekStart) + ' – ' + fmt(end) + ' ' + end.getFullYear();
 
-      // Zobrazenie iba mechanikov, admin v kalendári nebude
       const mechanics = data.mechanics.filter(m => m.role !== 'admin');
       const jobs = data.jobs.filter(j => j.date >= dateKey(weekStart) && j.date <= dateKey(end));
 
