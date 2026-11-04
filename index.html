@@ -134,6 +134,7 @@
     <div class="tabs" id="tabs">
       <button class="tab active" data-tab="calendar" onclick="showTab('calendar')">Kalendár dielne</button>
       <button class="tab admin-only" data-tab="jobsList" onclick="showTab('jobsList')">Zoznam zákaziek</button>
+      <button class="tab admin-only" data-tab="leavesList" onclick="showTab('leavesList')">Zoznam PN</button>
       <button class="tab admin-only" data-tab="notes" onclick="showTab('notes')">Moje poznámky</button>
       <button class="tab" data-tab="tires" onclick="showTab('tires')">Sklad pneu</button>
       <button class="tab admin-only" data-tab="vehicles" onclick="showTab('vehicles')">Vozidlá</button>
@@ -173,6 +174,15 @@
         </div>
       </div>
       <div class="tablewrap" id="jobsListTable"></div>
+    </div>
+
+    <!-- TAB: ZOZNAM PN (Iba pre Admina) -->
+    <div id="leavesListTab" class="panel section hidden admin-only">
+      <div class="headrow">
+        <h2>Prehľad nahlásených PN a neprítomností</h2>
+        <button class="btn" onclick="openLeaveModal()">+ Pridať PN / Neprítomnosť</button>
+      </div>
+      <div class="tablewrap" id="leavesTable"></div>
     </div>
 
     <!-- TAB: MOJE POZNÁMKY (Iba pre Admina) -->
@@ -333,6 +343,7 @@
       renderCalendar();
       if (me.role === 'admin') {
         renderJobsList();
+        renderLeavesList();
         renderAdminNotes();
       }
       renderTires();
@@ -363,10 +374,10 @@
 
     function showTab(tab) {
       activeTab = tab;
-      ['calendar', 'jobsList', 'notes', 'tires', 'vehicles', 'mechanics', 'password'].forEach(t => {
+      ['calendar', 'jobsList', 'leavesList', 'notes', 'tires', 'vehicles', 'mechanics', 'password'].forEach(t => {
         const el = $(t + 'Tab');
         if (el) {
-          if ((t === 'jobsList' || t === 'notes') && me && me.role !== 'admin') {
+          if ((t === 'jobsList' || t === 'leavesList' || t === 'notes') && me && me.role !== 'admin') {
             el.classList.add('hidden');
           } else {
             el.classList.toggle('hidden', t !== tab);
@@ -375,7 +386,7 @@
       });
 
       document.querySelectorAll('.tab').forEach(b => {
-        if ((b.dataset.tab === 'jobsList' || b.dataset.tab === 'notes') && me && me.role !== 'admin') {
+        if ((b.dataset.tab === 'jobsList' || b.dataset.tab === 'leavesList' || b.dataset.tab === 'notes') && me && me.role !== 'admin') {
           b.classList.add('hidden');
         } else {
           b.classList.toggle('active', b.dataset.tab === tab);
@@ -385,6 +396,7 @@
       $('pageTitle').textContent = ({
         calendar: 'Kalendár dielne',
         jobsList: 'Zoznam zákaziek',
+        leavesList: 'Zoznam PN a neprítomností',
         notes: 'Moje poznámky',
         tires: 'Sklad pneumatík',
         vehicles: 'Správa vozidiel',
@@ -439,7 +451,45 @@
             </tr>
           </thead>
           <tbody>
-            ${rows || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Žiadne zákazky v zoznam.</td></tr>'}
+            ${rows || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Žiadne zákazky v zozname.</td></tr>'}
+          </tbody>
+        </table>
+      `;
+    }
+
+    // Vykreslenie tabuľky v záložke "Zoznam PN"
+    function renderLeavesList() {
+      if (me.role !== 'admin') return;
+      const list = data.leaves.sort((a,b) => (b.startDate||'').localeCompare(a.startDate||''));
+
+      let rows = list.map(l => {
+        const m = mechanic(l.mechanicId);
+        return `
+          <tr>
+            <td><b>${esc(m.name || 'Neznámy mechanik')}</b></td>
+            <td>${esc(l.reason || 'PN / Neprítomný')}</td>
+            <td>${esc(l.startDate)}</td>
+            <td>${esc(l.endDate)}</td>
+            <td>
+              <button class="btn danger small" onclick="removeLeave('${l.id}')">Zrušiť</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      $('leavesTable').innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Mechanik</th>
+              <th>Dôvod / Typ</th>
+              <th>Od dátumu</th>
+              <th>Do dátumu</th>
+              <th>Akcia</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--muted)">Žiadne aktívne PN ani neprítomnosti.</td></tr>'}
           </tbody>
         </table>
       `;
@@ -594,16 +644,12 @@
         days.forEach(d => {
           const ds = dateKey(d);
           
-          // Zistíme, či je mechanik v tento deň na PN / neprítomný
           const leave = data.leaves.find(l => String(l.mechanicId) === String(m.id) && ds >= l.startDate && ds <= l.endDate);
-          
-          // Vyfiltrujeme zákazky
           const list = jobs.filter(j => String(j.mechanicId) === String(m.id) && String(j.date) === String(ds));
           list.sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
 
           let cellContent = '';
           
-          // Ak je na PN, zobrazíme výstražný červený box s možnosťou zrušenia
           if (leave) {
             cellContent += `
               <div class="leave-box">
@@ -874,7 +920,6 @@
       setTimeout(checkMechanicLeave, 100);
     }
 
-    // Kontrola, či mechanik nie je na PN pri plánovaní
     function checkMechanicLeave() {
       const mechId = $('jMechanic')?.value;
       const dateVal = $('jDate')?.value;
@@ -895,7 +940,6 @@
       const mechId = $('jMechanic').value;
       const dateVal = $('jDate').value;
       
-      // Upozornenie, ak je na PN, ale umožníme to uložiť, ak by to bolo nutné
       const onLeave = data.leaves.some(l => String(l.mechanicId) === String(mechId) && dateVal >= l.startDate && dateVal <= l.endDate);
       if(onLeave) {
         if(!confirm('Upozornenie: Mechanik má v tento deň nahlásenú PN/neprítomnosť! Naozaj chcete napriek tomu pridať zákazku?')) return;
