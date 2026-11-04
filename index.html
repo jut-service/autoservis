@@ -128,6 +128,7 @@
 
     <div class="tabs" id="tabs">
       <button class="tab active" data-tab="calendar" onclick="showTab('calendar')">Kalendár dielne</button>
+      <button class="tab admin-only" data-tab="jobsList" onclick="showTab('jobsList')">Zoznam zákaziek</button>
       <button class="tab admin-only" data-tab="notes" onclick="showTab('notes')">Moje poznámky</button>
       <button class="tab" data-tab="tires" onclick="showTab('tires')">Sklad pneu</button>
       <button class="tab admin-only" data-tab="vehicles" onclick="showTab('vehicles')">Vozidlá</button>
@@ -155,6 +156,18 @@
           <div id="calendarGrid" class="calgrid"></div>
         </div>
       </div>
+    </div>
+
+    <!-- TAB: ZOZNAM ZÁKAZIEK (Iba pre Admina) -->
+    <div id="jobsListTab" class="panel section hidden admin-only">
+      <div class="headrow">
+        <h2>Kompletný zoznam všetkých zákaziek</h2>
+        <div class="toolbar">
+          <input type="text" id="jobSearch" placeholder="Hľadať zákazku (ŠPZ, popis...)..." oninput="renderJobsList()" style="width:260px">
+          <button class="btn" onclick="openJob()">+ Naplánovať zákazku</button>
+        </div>
+      </div>
+      <div class="tablewrap" id="jobsListTable"></div>
     </div>
 
     <!-- TAB: MOJE POZNÁMKY (Iba pre Admina) -->
@@ -305,6 +318,7 @@
     function renderAll() {
       renderCalendar();
       if (me.role === 'admin') {
+        renderJobsList();
         renderAdminNotes();
       }
       renderTires();
@@ -335,10 +349,10 @@
 
     function showTab(tab) {
       activeTab = tab;
-      ['calendar', 'notes', 'tires', 'vehicles', 'mechanics', 'password'].forEach(t => {
+      ['calendar', 'jobsList', 'notes', 'tires', 'vehicles', 'mechanics', 'password'].forEach(t => {
         const el = $(t + 'Tab');
         if (el) {
-          if (t === 'notes' && me && me.role !== 'admin') {
+          if ((t === 'jobsList' || t === 'notes') && me && me.role !== 'admin') {
             el.classList.add('hidden');
           } else {
             el.classList.toggle('hidden', t !== tab);
@@ -347,7 +361,7 @@
       });
 
       document.querySelectorAll('.tab').forEach(b => {
-        if (b.dataset.tab === 'notes' && me && me.role !== 'admin') {
+        if ((b.dataset.tab === 'jobsList' || b.dataset.tab === 'notes') && me && me.role !== 'admin') {
           b.classList.add('hidden');
         } else {
           b.classList.toggle('active', b.dataset.tab === tab);
@@ -356,12 +370,65 @@
 
       $('pageTitle').textContent = ({
         calendar: 'Kalendár dielne',
+        jobsList: 'Zoznam zákaziek',
         notes: 'Moje poznámky',
         tires: 'Sklad pneumatík',
         vehicles: 'Správa vozidiel',
         mechanics: 'Zoznam mechanikov',
         password: 'Zmena hesla'
       })[tab] || '';
+    }
+
+    function renderJobsList() {
+      if (me.role !== 'admin') return;
+      const q = ($('jobSearch')?.value || '').toLowerCase();
+      const list = data.jobs.filter(j => {
+        const v = vehicle(j.vehicleId);
+        const m = mechanic(j.mechanicId);
+        const searchStr = (j.date + ' ' + (v.plate||'') + ' ' + (v.make||'') + ' ' + (v.model||'') + ' ' + (v.customer||'') + ' ' + (m.name||'') + ' ' + j.task + ' ' + j.status).toLowerCase();
+        return searchStr.includes(q);
+      }).sort((a,b) => (b.date||'').localeCompare(a.date||''));
+
+      let rows = list.map(j => {
+        const v = vehicle(j.vehicleId);
+        const m = mechanic(j.mechanicId);
+        return `
+          <tr>
+            <td><b>${esc(j.date)}</b></td>
+            <td><b>${esc(v.plate || 'Bez ŠPZ')}</b><br><small class="muted">${esc((v.make||'') + ' ' + (v.model||''))}</small></td>
+            <td>${esc(m.name || 'Nepriradený')}</td>
+            <td>${esc(j.startTime || '08:00')} - ${esc(j.endTime || '16:00')}</td>
+            <td>${esc(j.task)}</td>
+            <td>
+              <select class="status-select" onchange="statusChange('${j.id}', this.value)">
+                ${STATUSES.map(s => `<option value="${s}" ${j.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+              </select>
+            </td>
+            <td>
+              <button class="btn secondary small" onclick="editJob('${j.id}')">Upraviť</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      $('jobsListTable').innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Dátum</th>
+              <th>Vozidlo / ŠPZ</th>
+              <th>Mechanik</th>
+              <th>Čas</th>
+              <th>Popis práce</th>
+              <th>Stav</th>
+              <th>Akcia</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Žiadne zákazky v zozname.</td></tr>'}
+          </tbody>
+        </table>
+      `;
     }
 
     function renderAdminNotes() {
@@ -719,9 +786,9 @@
     
     async function saveJobForm(id) {
       const vehicleId = $('jVehicle').value;
-      const newPlate = $('jNewPlate').value.trim();
+      const newPlate = $('jNewPlate')?.value.trim() || '';
 
-      if (!vehicleId && !newPlate) {
+      if (!id && !vehicleId && !newPlate) {
         alert('Musíte buď vybrať existujúce vozidlo zo zoznamu, alebo vyplniť novú ŠPZ!');
         return;
       }
@@ -732,8 +799,8 @@
         mechanicId: $('jMechanic').value, 
         vehicleId: vehicleId, 
         newPlate: newPlate,
-        newMake: $('jNewMake').value,
-        newCustomer: $('jNewCustomer').value,
+        newMake: $('jNewMake')?.value || '',
+        newCustomer: $('jNewCustomer')?.value || '',
         status: $('jStatus').value, 
         startTime: $('jStart').value, 
         endTime: $('jEnd').value, 
@@ -748,8 +815,12 @@
     }
 
     async function removeJob(id) {
-      if(!confirm('Odstrániť túto zákazku?')) return;
-      try { await call('deleteJob', token, id); closeModal(); await loadData(); } catch(e) { alert(e.message); }
+      if(!confirm('Naozaj odstrániť túto zákazku?')) return;
+      try { 
+        await call('deleteJob', token, id); 
+        closeModal(); 
+        await loadData(); 
+      } catch(e) { alert(e.message); }
     }
 
     async function statusChange(id, status) {
