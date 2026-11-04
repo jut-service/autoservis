@@ -93,6 +93,7 @@
     <div class="brand">AUTO<span>SERVIS</span> <span style="color:#cbd6ec;font-weight:500">/ plánovač</span></div>
     <div class="top-actions">
       <span id="who"></span>
+      <button class="btn secondary small hidden admin-only" id="refreshBtn" onclick="loadData()">🔄 Obnoviť dáta</button>
       <button id="logoutBtn" class="btn secondary small hidden" onclick="logout()">Odhlásiť</button>
     </div>
   </header>
@@ -290,6 +291,7 @@
       $('appView').classList.add('hidden');
       $('loginView').classList.remove('hidden');
       $('logoutBtn').classList.add('hidden');
+      $('refreshBtn').classList.add('hidden');
       $('who').textContent = '';
     }
 
@@ -303,6 +305,7 @@
         $('loginView').classList.add('hidden');
         $('appView').classList.remove('hidden');
         $('logoutBtn').classList.remove('hidden');
+        $('refreshBtn').classList.remove('hidden');
         $('who').textContent = me.name + ' · ' + (me.role === 'admin' ? 'Admin' : 'Mechanik');
 
         const isAdmin = me.role === 'admin';
