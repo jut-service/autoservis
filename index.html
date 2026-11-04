@@ -116,7 +116,7 @@
     <div class="headrow">
       <div>
         <h1 id="pageTitle">Prehľad dielne</h1>
-        <div class="muted" id="pageSub">Správa a plánovanie servisu</div>
+        <div class="muted" id="pageSub">Správa a plánowanie servisu</div>
       </div>
       <div class="toolbar" id="topActionsBar">
         <button class="btn admin-only" onclick="openJob()">+ Naplánovať auto</button>
@@ -279,9 +279,11 @@
           el.classList.toggle('hidden', !isAdmin);
         });
 
-        // Ak je prihlásený mechanik a práve bol na kalendári, prepneme ho automaticky na Sklad pneu
-        if (!isAdmin && activeTab === 'calendar') {
+        // Ak je prihlásený mechanik, štandardne ho hodíme na Sklad pneu (keďže kalendár nemá)
+        if (!isAdmin) {
           showTab('tires');
+        } else {
+          showTab('calendar');
         }
 
         renderAll();
@@ -324,11 +326,28 @@
 
     function showTab(tab) {
       activeTab = tab;
+      // Ak nie je admin, nedovolíme mu zobraziť kalendár
+      if (tab === 'calendar' && me && me.role !== 'admin') return;
+
       ['calendar', 'tires', 'vehicles', 'mechanics', 'password'].forEach(t => {
         const el = $(t + 'Tab');
-        if (el) el.classList.toggle('hidden', t !== tab);
+        if (el) {
+          if (t === 'calendar') {
+            el.classList.toggle('hidden', tab !== 'calendar' || (me && me.role !== 'admin'));
+          } else {
+            el.classList.toggle('hidden', t !== tab);
+          }
+        }
       });
-      document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+
+      document.querySelectorAll('.tab').forEach(b => {
+        if (b.dataset.tab === 'calendar' && me && me.role !== 'admin') {
+          b.classList.add('hidden');
+        } else {
+          b.classList.toggle('active', b.dataset.tab === tab);
+        }
+      });
+
       $('pageTitle').textContent = ({
         calendar: 'Prehľad dielne',
         tires: 'Sklad pneumatík',
@@ -342,7 +361,7 @@
     function mechanic(id) { return data.mechanics.find(m => m.id === id) || {}; }
 
     function renderCalendar() {
-      if (me.role !== 'admin') return;
+      if (!me || me.role !== 'admin') return;
       const days = Array.from({length:7}, (_,i) => plusDays(weekStart, i));
       const end = plusDays(weekStart, 6);
       $('weekLabel').textContent = fmt(weekStart) + ' – ' + fmt(end) + ' ' + end.getFullYear();
