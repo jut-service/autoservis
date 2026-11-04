@@ -100,7 +100,7 @@
   <main id="loginView" class="login-wrap">
     <div class="panel login">
       <h1>Prihlásenie</h1>
-      <p class="sub">Plánowanie práce a správa pneu</p>
+      <p class="sub">Plánovanie práce a správa pneu</p>
       <form onsubmit="event.preventDefault(); doLogin()">
         <label>Prihlasovacie meno</label>
         <input id="loginUser" autocomplete="username" required value="">
@@ -341,7 +341,8 @@
       const end = plusDays(weekStart, 6);
       $('weekLabel').textContent = fmt(weekStart) + ' – ' + fmt(end) + ' ' + end.getFullYear();
 
-      const mechanics = data.mechanics;
+      // Zobrazenie iba mechanikov, admin v kalendári nebude
+      const mechanics = data.mechanics.filter(m => m.role !== 'admin');
       const jobs = data.jobs.filter(j => j.date >= dateKey(weekStart) && j.date <= dateKey(end));
 
       $('statJobs').textContent = jobs.length;
