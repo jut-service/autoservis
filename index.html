@@ -100,7 +100,7 @@
   <main id="loginView" class="login-wrap">
     <div class="panel login">
       <h1>Prihlásenie</h1>
-      <p class="sub">Plánovanie práce a správa pneu</p>
+      <p class="sub">Plánowanie práce a správa pneu</p>
       <form onsubmit="event.preventDefault(); doLogin()">
         <label>Prihlasovacie meno</label>
         <input id="loginUser" autocomplete="username" required value="">
@@ -223,7 +223,6 @@
     const $ = id => document.getElementById(id);
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-    // Volanie backendu cez Fetch API namiesto google.script.run
     async function call(name, ...args) {
       try {
         const response = await fetch(API_URL, {
@@ -541,7 +540,7 @@
       try { await call('saveVehicle', token, v); closeModal(); await loadData(); } catch(e) { alert(e.message); }
     }
     async function removeVehicle(id) {
-      if(!confirm('Naozaj odstránić vozidlo?')) return;
+      if(!confirm('Naozaj odstrániť vozidlo?')) return;
       try { await call('deleteVehicle', token, id); closeModal(); await loadData(); } catch(e) { alert(e.message); }
     }
 
