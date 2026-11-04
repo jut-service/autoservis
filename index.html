@@ -135,7 +135,7 @@
       <button class="tab" data-tab="password" onclick="showTab('password')">Zmena hesla</button>
     </div>
 
-    <!-- TAB: KALENDÁR DIELNE (Pre všetkých, bez admina v zozname) -->
+    <!-- TAB: KALENDÁR DIELNE -->
     <div id="calendarTab">
       <div class="stats">
         <div class="panel stat"><div class="num" id="statJobs">0</div><div class="caption">Zákazky v tomto týždni</div></div>
@@ -679,16 +679,33 @@
     function openJob(j={}) {
       if (me.role !== 'admin') return;
       const today = dateKey(new Date());
-      const vehicleOpts = data.vehicles.map(v => `<option value="${v.id}" ${j.vehicleId===v.id?'selected':''}>${esc(v.plate)} – ${esc(v.make)} ${esc(v.model)}</option>`).join('');
+      const vehicleOpts = data.vehicles.map(v => `<option value="${v.id}" ${j.vehicleId===v.id?'selected':''}>${esc(v.plate)} – ${esc(v.make)} ${esc(v.model)} (${esc(v.customer)})</option>`).join('');
       const mechOpts = data.mechanics.map(m => `<option value="${m.id}" ${j.mechanicId===m.id?'selected':''}>${esc(m.name)}</option>`).join('');
+      
       openModal(j.id ? 'Upraviť zákazku' : 'Naplánovať vozidlo', `
         <div class="formgrid">
           <div><label>Dátum *</label><input id="jDate" type="date" value="${esc(j.date||today)}"></div>
           <div><label>Mechanik *</label><select id="jMechanic"><option value="">Vyber mechanika</option>${mechOpts}</select></div>
-          <div><label>Vozidlo *</label><select id="jVehicle"><option value="">Vyber vozidlo</option>${vehicleOpts}</select></div>
+          
+          <div class="span2" style="background:#f8faff;padding:12px;border-radius:8px;border:1px solid #d9deea;margin-top:6px">
+            <label style="margin-top:0">1. Vybrať existujúce vozidlo zo zoznamu:</label>
+            <select id="jVehicle"><option value="">-- Alebo vyber z existujúcich --</option>${vehicleOpts}</select>
+            
+            <div style="margin-top:10px;font-size:12px;color:var(--muted);font-weight:700">ALEBO ZAPÍSAŤ NOVÉ VOZIDLO PRIAMO TU:</div>
+            <div class="formgrid" style="margin-top:6px">
+              <div><label>Nová ŠPZ *</label><input id="jNewPlate" placeholder="např. ZA123BC"></div>
+              <div><label>Značka a model</label><input id="jNewMake" placeholder="např. Škoda Octavia"></div>
+              <div class="span2"><label>Meno zákazníka</label><input id="jNewCustomer" placeholder="Ján Mrkvovička"></div>
+            </div>
+          </div>
+
           <div><label>Stav</label><select id="jStatus">${STATUSES.map(s => `<option ${j.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
-          <div><label>Od</label><input id="jStart" type="time" value="${esc(j.startTime||'08:00')}"></div>
-          <div><label>Do</label><input id="jEnd" type="time" value="${esc(j.endTime||'16:00')}"></div>
+          <div><label>Čas od - do</label>
+            <div style="display:flex;gap:6px">
+              <input id="jStart" type="time" value="${esc(j.startTime||'08:00')}">
+              <input id="jEnd" type="time" value="${esc(j.endTime||'16:00')}">
+            </div>
+          </div>
           <div class="span2"><label>Popis práce *</label><textarea id="jTask">${esc(j.task||'')}</textarea></div>
         </div>
         <div class="modalactions">
@@ -699,10 +716,37 @@
     }
 
     function editJob(id) { openJob(data.jobs.find(j => j.id === id)); }
+    
     async function saveJobForm(id) {
-      const j = { id: id||undefined, date:$('jDate').value, mechanicId:$('jMechanic').value, vehicleId:$('jVehicle').value, status:$('jStatus').value, startTime:$('jStart').value, endTime:$('jEnd').value, task:$('jTask').value };
-      try { await call('saveJob', token, j); closeModal(); await loadData(); } catch(e) { alert(e.message); }
+      const vehicleId = $('jVehicle').value;
+      const newPlate = $('jNewPlate').value.trim();
+
+      if (!vehicleId && !newPlate) {
+        alert('Musíte buď vybrať existujúce vozidlo zo zoznamu, alebo vyplniť novú ŠPZ!');
+        return;
+      }
+
+      const j = { 
+        id: id || undefined, 
+        date: $('jDate').value, 
+        mechanicId: $('jMechanic').value, 
+        vehicleId: vehicleId, 
+        newPlate: newPlate,
+        newMake: $('jNewMake').value,
+        newCustomer: $('jNewCustomer').value,
+        status: $('jStatus').value, 
+        startTime: $('jStart').value, 
+        endTime: $('jEnd').value, 
+        task: $('jTask').value 
+      };
+
+      try { 
+        await call('saveJob', token, j); 
+        closeModal(); 
+        await loadData(); 
+      } catch(e) { alert(e.message); }
     }
+
     async function removeJob(id) {
       if(!confirm('Odstrániť túto zákazku?')) return;
       try { await call('deleteJob', token, id); closeModal(); await loadData(); } catch(e) { alert(e.message); }
