@@ -243,6 +243,7 @@
     let activeTab = 'calendar';
 
     const STATUSES = ['Čaká na spracovanie', 'Rozpracované', 'Dokončené'];
+    const TIME_OPTIONS = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'];
 
     const $ = id => document.getElementById(id);
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -521,7 +522,6 @@
 
       const mechanics = data.mechanics.filter(m => m.role !== 'admin');
       
-      // Bezpečné filtrovanie zákaziek na základe porovnania dátumov
       const startKey = dateKey(weekStart);
       const endKey = dateKey(end);
       const jobs = data.jobs.filter(j => j.date >= startKey && j.date <= endKey);
@@ -753,6 +753,9 @@
       const vehicleOpts = data.vehicles.map(v => `<option value="${v.id}" ${j.vehicleId===v.id?'selected':''}>${esc(v.plate)} – ${esc(v.make)} ${esc(v.model)} (${esc(v.customer)})</option>`).join('');
       const mechOpts = data.mechanics.map(m => `<option value="${m.id}" ${j.mechanicId===m.id?'selected':''}>${esc(m.name)}</option>`).join('');
       
+      const startOpts = TIME_OPTIONS.map(t => `<option value="${t}" ${j.startTime===t?'selected':(t==='08:00'&&!j.startTime?'selected':'')}>${t}</option>`).join('');
+      const endOpts = TIME_OPTIONS.map(t => `<option value="${t}" ${j.endTime===t?'selected':(t==='16:00'&&!j.endTime?'selected':'')}>${t}</option>`).join('');
+
       openModal(j.id ? 'Upraviť zákazku' : 'Naplánovať vozidlo', `
         <div class="formgrid">
           <div><label>Dátum *</label><input id="jDate" type="date" value="${esc(j.date||today)}"></div>
@@ -773,8 +776,8 @@
           <div><label>Stav</label><select id="jStatus">${STATUSES.map(s => `<option ${j.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
           <div><label>Čas od - do</label>
             <div style="display:flex;gap:6px">
-              <input id="jStart" type="time" value="${esc(j.startTime||'08:00')}">
-              <input id="jEnd" type="time" value="${esc(j.endTime||'16:00')}">
+              <select id="jStart">${startOpts}</select>
+              <select id="jEnd">${endOpts}</select>
             </div>
           </div>
           <div class="span2"><label>Popis práce *</label><textarea id="jTask">${esc(j.task||'')}</textarea></div>
