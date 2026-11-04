@@ -42,7 +42,6 @@
     .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px;margin-bottom:17px}
     .stat{padding:16px 18px}.stat .num{font-size:25px;font-weight:800}.stat .caption{color:var(--muted);font-size:12px}
     
-    /* Prehľadný a veľký kalendár */
     .calendar{overflow-x:auto}
     .calgrid{min-width:1100px;display:grid;grid-template-columns:180px repeat(7,minmax(130px,1fr))}
     .calhead,.calname,.calcell{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:10px}
@@ -211,6 +210,8 @@
   </div>
 
   <script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbyEBvRJZ-zP6OZBuSCwNHnIuDCtfat0S3jTeU-JVZMTUY4M0bXt1IWpHmLMJ8xvq8zfNw/exec";
+    
     let token = sessionStorage.getItem('as_token') || '';
     let me = null;
     let data = { users:[], mechanics:[], vehicles:[], jobs:[], tires:[] };
@@ -222,17 +223,21 @@
     const $ = id => document.getElementById(id);
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-    function call(name, ...args) {
-      return new Promise((resolve, reject) => {
-        if (!google || !google.script || !google.script.run) {
-          reject(new Error("Google Script environment nedostupný."));
-          return;
+    // Volanie backendu cez Fetch API namiesto google.script.run
+    async function call(name, ...args) {
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          body: JSON.stringify({ fn: name, args: args })
+        });
+        const res = await response.json();
+        if (res.status === 'error') {
+          throw new Error(res.message);
         }
-        google.script.run
-          .withSuccessHandler(resolve)
-          .withFailureHandler(e => reject(new Error(e.message || e)))
-          [name](...args);
-      });
+        return res.data;
+      } catch (e) {
+        throw new Error(e.message || 'Chyba pri komunikácii so serverom.');
+      }
     }
 
     async function doLogin() {
@@ -270,7 +275,6 @@
         $('logoutBtn').classList.remove('hidden');
         $('who').textContent = me.name + ' · ' + (me.role === 'admin' ? 'Admin' : 'Mechanik');
 
-        // Zobrazenie prvkov podľa roly
         const isAdmin = me.role === 'admin';
         document.querySelectorAll('.admin-only').forEach(el => {
           el.classList.toggle('hidden', !isAdmin);
@@ -333,13 +337,11 @@
     function vehicle(id) { return data.vehicles.find(v => v.id === id) || {}; }
     function mechanic(id) { return data.mechanics.find(m => m.id === id) || {}; }
 
-    /* KALENDÁR DIELNE (Prehľad pre všetkých) */
     function renderCalendar() {
       const days = Array.from({length:7}, (_,i) => plusDays(weekStart, i));
       const end = plusDays(weekStart, 6);
       $('weekLabel').textContent = fmt(weekStart) + ' – ' + fmt(end) + ' ' + end.getFullYear();
 
-      // Zobrazení sú všetci mechanici, aby každý videl celú dielňu
       const mechanics = data.mechanics;
       const jobs = data.jobs.filter(j => j.date >= dateKey(weekStart) && j.date <= dateKey(end));
 
@@ -365,9 +367,6 @@
 
     function jobCard(j) {
       const v = vehicle(j.vehicleId);
-      const isDone = j.status === 'Dokončené';
-      const isWork = j.status === 'Rozpracované';
-
       return `
         <div class="job status-${esc(j.status)}">
           <strong>${esc(v.plate || 'Bez ŠPZ')} · ${esc((v.make || '') + ' ' + (v.model || ''))}</strong>
@@ -385,7 +384,6 @@
       `;
     }
 
-    /* SKLAD PNEUMATÍK (Upravovať môžu aj mechanici) */
     function renderTires() {
       const q = ($('tireSearch')?.value || '').toLowerCase();
       const list = data.tires.filter(t => {
@@ -506,7 +504,6 @@
       }
     }
 
-    /* SPRÁVA VOZIDIEL (Admin) */
     function renderVehicles() {
       if (me.role !== 'admin') return;
       let rows = data.vehicles.map(v => `
@@ -544,11 +541,10 @@
       try { await call('saveVehicle', token, v); closeModal(); await loadData(); } catch(e) { alert(e.message); }
     }
     async function removeVehicle(id) {
-      if(!confirm('Naozaj odstrániť vozidlo?')) return;
+      if(!confirm('Naozaj odstránić vozidlo?')) return;
       try { await call('deleteVehicle', token, id); closeModal(); await loadData(); } catch(e) { alert(e.message); }
     }
 
-    /* SPRÁVA MECHANIKOV (Admin) */
     function renderMechanics() {
       if (me.role !== 'admin') return;
       let rows = data.mechanics.map(m => `
@@ -575,7 +571,6 @@
       try { await call('saveMechanic', token, { id: id||undefined, name:$('mName').value, username:$('mUser').value, password:$('mPass').value }); closeModal(); await loadData(); } catch(e) { alert(e.message); }
     }
 
-    /* PLÁNOVANIE ZÁKAZIEK (Admin práva) */
     function openJob(j={}) {
       if (me.role !== 'admin') return;
       const today = dateKey(new Date());
@@ -608,7 +603,6 @@
       try { await call('deleteJob', token, id); closeModal(); await loadData(); } catch(e) { alert(e.message); }
     }
 
-    /* MECHANIK AJ ADMIN: Zmena stavu zákazky */
     async function statusChange(id, status) {
       try {
         await call('updateJobStatus', token, id, status);
