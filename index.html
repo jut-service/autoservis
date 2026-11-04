@@ -520,7 +520,11 @@
       $('weekLabel').textContent = fmt(weekStart) + ' – ' + fmt(end) + ' ' + end.getFullYear();
 
       const mechanics = data.mechanics.filter(m => m.role !== 'admin');
-      const jobs = data.jobs.filter(j => j.date >= dateKey(weekStart) && j.date <= dateKey(end));
+      
+      // Bezpečné filtrovanie zákaziek na základe porovnania dátumov
+      const startKey = dateKey(weekStart);
+      const endKey = dateKey(end);
+      const jobs = data.jobs.filter(j => j.date >= startKey && j.date <= endKey);
 
       $('statJobs').textContent = jobs.length;
       $('statMechanics').textContent = mechanics.length;
