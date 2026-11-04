@@ -546,7 +546,10 @@
         html += `<div class="calname"><span class="dot"></span>${esc(m.name)}</div>`;
         days.forEach(d => {
           const ds = dateKey(d);
+          // Zobereme VŠETKY zákazky pre daného mechanika a deň, zoradené podľa času
           const list = jobs.filter(j => j.mechanicId === m.id && j.date === ds).sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
+          
+          // Vyrenderujeme každú jednu nájdenú zákazku do bunkového poľa pod seba
           html += `<div class="calcell">${list.length ? list.map(j => jobCard(j)).join('') : '<span class="empty">Bez plánu</span>'}</div>`;
         });
       });
