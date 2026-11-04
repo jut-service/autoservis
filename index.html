@@ -115,26 +115,28 @@
   <main id="appView" class="wrap hidden">
     <div class="headrow">
       <div>
-        <h1 id="pageTitle">Prehľad dielne</h1>
-        <div class="muted" id="pageSub">Správa a plánowanie servisu</div>
+        <h1 id="pageTitle">Kalendár dielne</h1>
+        <div class="muted" id="pageSub">Týždenný plán práce mechanikov</div>
       </div>
       <div class="toolbar" id="topActionsBar">
         <button class="btn admin-only" onclick="openJob()">+ Naplánovať auto</button>
         <button class="btn secondary admin-only" onclick="openVehicle()">+ Vozidlo</button>
+        <button class="btn secondary admin-only" onclick="openAdminNoteModal()">+ Moja poznámka</button>
         <button class="btn secondary" onclick="openTireModal()">+ Uložiť pneu</button>
       </div>
     </div>
 
     <div class="tabs" id="tabs">
-      <button class="tab admin-only active" data-tab="calendar" onclick="showTab('calendar')">Kalendár dielne</button>
+      <button class="tab active" data-tab="calendar" onclick="showTab('calendar')">Kalendár dielne</button>
+      <button class="tab admin-only" data-tab="notes" onclick="showTab('notes')">Moje poznámky</button>
       <button class="tab" data-tab="tires" onclick="showTab('tires')">Sklad pneu</button>
       <button class="tab admin-only" data-tab="vehicles" onclick="showTab('vehicles')">Vozidlá</button>
       <button class="tab admin-only" data-tab="mechanics" onclick="showTab('mechanics')">Mechanici</button>
       <button class="tab" data-tab="password" onclick="showTab('password')">Zmena hesla</button>
     </div>
 
-    <!-- TAB: KALENDÁR (Viditeľný iba pre Admina) -->
-    <div id="calendarTab" class="admin-only">
+    <!-- TAB: KALENDÁR DIELNE (Pre všetkých, bez admina v zozname) -->
+    <div id="calendarTab">
       <div class="stats">
         <div class="panel stat"><div class="num" id="statJobs">0</div><div class="caption">Zákazky v tomto týždni</div></div>
         <div class="panel stat"><div class="num" id="statMechanics">0</div><div class="caption">Aktívni mechanici</div></div>
@@ -153,6 +155,15 @@
           <div id="calendarGrid" class="calgrid"></div>
         </div>
       </div>
+    </div>
+
+    <!-- TAB: MOJE POZNÁMKY (Iba pre Admina) -->
+    <div id="notesTab" class="panel section hidden admin-only">
+      <div class="headrow">
+        <h2>Moje poznámky a pripomenutia</h2>
+        <button class="btn" onclick="openAdminNoteModal()">+ Pridať poznámku</button>
+      </div>
+      <div class="tablewrap" id="notesTable"></div>
     </div>
 
     <!-- TAB: SKLAD PNEU -->
@@ -214,7 +225,7 @@
     
     let token = sessionStorage.getItem('as_token') || '';
     let me = null;
-    let data = { users:[], mechanics:[], vehicles:[], jobs:[], tires:[] };
+    let data = { users:[], mechanics:[], vehicles:[], jobs:[], tires:[], adminNotes:[] };
     let weekStart = monday(new Date());
     let activeTab = 'calendar';
 
@@ -267,6 +278,7 @@
       try {
         data = await call('getAppData', token);
         if(!data.tires) data.tires = [];
+        if(!data.adminNotes) data.adminNotes = [];
         me = data.user;
 
         $('loginView').classList.add('hidden');
@@ -279,13 +291,7 @@
           el.classList.toggle('hidden', !isAdmin);
         });
 
-        // Ak je prihlásený mechanik, štandardne ho hodíme na Sklad pneu (keďže kalendár nemá)
-        if (!isAdmin) {
-          showTab('tires');
-        } else {
-          showTab('calendar');
-        }
-
+        showTab('calendar');
         renderAll();
       } catch(e) {
         $('loginError').textContent = e.message;
@@ -297,7 +303,10 @@
     }
 
     function renderAll() {
-      if (me.role === 'admin') renderCalendar();
+      renderCalendar();
+      if (me.role === 'admin') {
+        renderAdminNotes();
+      }
       renderTires();
       renderVehicles();
       renderMechanics();
@@ -326,14 +335,11 @@
 
     function showTab(tab) {
       activeTab = tab;
-      // Ak nie je admin, nedovolíme mu zobraziť kalendár
-      if (tab === 'calendar' && me && me.role !== 'admin') return;
-
-      ['calendar', 'tires', 'vehicles', 'mechanics', 'password'].forEach(t => {
+      ['calendar', 'notes', 'tires', 'vehicles', 'mechanics', 'password'].forEach(t => {
         const el = $(t + 'Tab');
         if (el) {
-          if (t === 'calendar') {
-            el.classList.toggle('hidden', tab !== 'calendar' || (me && me.role !== 'admin'));
+          if (t === 'notes' && me && me.role !== 'admin') {
+            el.classList.add('hidden');
           } else {
             el.classList.toggle('hidden', t !== tab);
           }
@@ -341,7 +347,7 @@
       });
 
       document.querySelectorAll('.tab').forEach(b => {
-        if (b.dataset.tab === 'calendar' && me && me.role !== 'admin') {
+        if (b.dataset.tab === 'notes' && me && me.role !== 'admin') {
           b.classList.add('hidden');
         } else {
           b.classList.toggle('active', b.dataset.tab === tab);
@@ -349,7 +355,8 @@
       });
 
       $('pageTitle').textContent = ({
-        calendar: 'Prehľad dielne',
+        calendar: 'Kalendár dielne',
+        notes: 'Moje poznámky',
         tires: 'Sklad pneumatík',
         vehicles: 'Správa vozidiel',
         mechanics: 'Zoznam mechanikov',
@@ -357,11 +364,90 @@
       })[tab] || '';
     }
 
+    function renderAdminNotes() {
+      if (me.role !== 'admin') return;
+      let rows = data.adminNotes.sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(n => `
+        <tr>
+          <td><b>${esc(n.date)}</b></td>
+          <td><span style="${n.done ? 'text-decoration:line-through;color:var(--muted)' : ''}">${esc(n.text)}</span></td>
+          <td><span class="badge ${n.done ? 'done' : 'todo'}">${n.done ? 'Vybavené' : 'Aktívne'}</span></td>
+          <td>
+            <button class="btn secondary small" onclick="openAdminNoteModal('${n.id}')">Upraviť</button>
+          </td>
+        </tr>
+      `).join('');
+
+      $('notesTable').innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Dátum</th>
+              <th>Pripomenutie / Poznámka</th>
+              <th>Stav</th>
+              <th>Akcia</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted)">Žiadne poznámky. Pridajte si prvú.</td></tr>'}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function openAdminNoteModal(id = '') {
+      const n = data.adminNotes.find(item => item.id === id) || { date: dateKey(new Date()) };
+      openModal(id ? 'Upraviť poznámku' : 'Pridať novú poznámku', `
+        <div class="formgrid">
+          <div>
+            <label>Dátum *</label>
+            <input id="noteDate" type="date" value="${esc(n.date || '')}">
+          </div>
+          <div>
+            <label>Stav</label>
+            <select id="noteDone">
+              <option value="false" ${!n.done ? 'selected' : ''}>Aktívne</option>
+              <option value="true" ${n.done ? 'selected' : ''}>Vybavené</option>
+            </select>
+          </div>
+          <div class="span2">
+            <label>Poznámka / Čo netreba zabudnúť *</label>
+            <textarea id="noteText" placeholder="Napr. objednať olej, zavolať dodávateľovi...">${esc(n.text || '')}</textarea>
+          </div>
+        </div>
+        <div class="modalactions">
+          ${id ? `<button class="btn danger" onclick="removeAdminNote('${id}')">Odstrániť</button>` : ''}
+          <button class="btn" onclick="saveAdminNoteForm('${id}')">Uložiť poznámku</button>
+        </div>
+      `);
+    }
+
+    async function saveAdminNoteForm(id) {
+      const noteData = {
+        id: id || undefined,
+        date: $('noteDate').value,
+        text: $('noteText').value,
+        done: $('noteDone').value === 'true'
+      };
+      try {
+        await call('saveAdminNote', token, noteData);
+        closeModal();
+        await loadData();
+      } catch(e) { alert(e.message); }
+    }
+
+    async function removeAdminNote(id) {
+      if(!confirm('Naozaj vymazať túto poznámku?')) return;
+      try {
+        await call('deleteAdminNote', token, id);
+        closeModal();
+        await loadData();
+      } catch(e) { alert(e.message); }
+    }
+
     function vehicle(id) { return data.vehicles.find(v => v.id === id) || {}; }
     function mechanic(id) { return data.mechanics.find(m => m.id === id) || {}; }
 
     function renderCalendar() {
-      if (!me || me.role !== 'admin') return;
       const days = Array.from({length:7}, (_,i) => plusDays(weekStart, i));
       const end = plusDays(weekStart, 6);
       $('weekLabel').textContent = fmt(weekStart) + ' – ' + fmt(end) + ' ' + end.getFullYear();
@@ -507,14 +593,11 @@
         condition: $('tCondition').value,
         note: $('tNote').value
       };
-
       try {
         await call('saveTire', token, tireData);
         closeModal();
         await loadData();
-      } catch(e) {
-        alert(e.message);
-      }
+      } catch(e) { alert(e.message); }
     }
 
     async function removeTire(id) {
@@ -523,9 +606,7 @@
         await call('deleteTire', token, id);
         closeModal();
         await loadData();
-      } catch(e) {
-        alert(e.message);
-      }
+      } catch(e) { alert(e.message); }
     }
 
     function renderVehicles() {
