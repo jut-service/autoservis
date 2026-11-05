@@ -277,8 +277,7 @@
   </div>
 
   <script>
-    // SEM VLOŽTE VAŠU AKTUÁLNU URL ADRESU Z GOOGLE APPS SCRIPTU
-    const API_URL = "SEM_ZAPISTE_VAŠU_APPS_SCRIPT_URL";
+    const API_URL = "https://script.google.com/macros/s/AKfycbyEBvRJZ-zP6OZBuSCwNHnIuDCtfat0S3jTeU-JVZMTUY4M0bXt1IWpHmLMJ8xvq8zfNw/exec";
     
     let token = sessionStorage.getItem('as_token') || '';
     let me = null;
@@ -788,7 +787,7 @@
           <div class="span2" id="leaveWarning" style="background:#fff0f0;color:#c0393d;padding:10px;border-radius:6px;display:none;font-weight:600">⚠️ Mechanik má v tento deň PN!</div>
           <div class="span2" style="background:#f8faff;padding:12px;border-radius:8px;border:1px solid #d9deea">
             <label style="margin-top:0">Existujúce vozidlo:</label><select id="jVehicle"><option value="">-- Vyber --</option>${vehicleOpts}</select>
-            <div style="margin-top:8px;font-weight:700;font-size:12px">ALEbo NOVÁ ŠPZ:</div>
+            <div style="margin-top:8px;font-weight:700;font-size:12px">ALEBO NOVÁ ŠPZ:</div>
             <div class="formgrid" style="margin-top:4px">
               <div><input id="jNewPlate" placeholder="Napr. ZA123BC"></div>
               <div><input id="jNewMake" placeholder="Značka/model"></div>
@@ -861,7 +860,6 @@
     }
     function closeModal() { $('modalBack').classList.add('hidden'); }
 
-    // Automatické prihlásenie ak existuje token
     if (token) { loadData(); }
   </script>
 </body>
