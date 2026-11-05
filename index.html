@@ -337,7 +337,8 @@
       } catch(e) {
         $('loginError').textContent = e.message;
         token = ''; sessionStorage.removeItem('as_token');
-        $('loginView').classList.add('hidden'); $('appView').classList.add('hidden');
+        $('loginView').classList.remove('hidden');
+        $('appView').classList.add('hidden');
       }
     }
 
@@ -458,7 +459,13 @@
     function mechanic(id) { return data.mechanics.find(m => m.id === id) || {}; }
     function vehicle(id) { return {}; }
 
-    if (token) { loadData(); }
+    // Start aplikácie s korektným ošetrením tokenu
+    if (token) {
+      loadData();
+    } else {
+      $('loginView').classList.remove('hidden');
+      $('appView').classList.add('hidden');
+    }
   </script>
 </body>
 </html>
