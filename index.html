@@ -135,7 +135,7 @@
     <div class="tabs" id="tabs">
       <button class="tab active" data-tab="calendar" onclick="showTab('calendar')">Kalendár dielne</button>
       <button class="tab admin-only" data-tab="jobsList" onclick="showTab('jobsList')">Zoznam zákaziek</button>
-      <button class="tab admin-only" data-tab="leavesList" onclick="showTab('leavesList')">Zoznam PN</button>
+      <button class="tab admin-only" data-tab="leavesList" onclick="showTab('leavesList')">Kalendár PN</button>
       <button class="tab admin-only" data-tab="notes" onclick="showTab('notes')">Moje poznámky</button>
       <button class="tab" data-tab="tires" onclick="showTab('tires')">Sklad pneu</button>
       <button class="tab admin-only" data-tab="vehicles" onclick="showTab('vehicles')">Vozidlá</button>
@@ -178,12 +178,20 @@
       <div class="tablewrap" id="jobsListTable"></div>
     </div>
 
-    <!-- TAB: ZOZNAM PN -->
+    <!-- TAB: KALENDÁR PN (Vizuálny kalendár + zoznam PN pre všetkých vrátane adminov) -->
     <div id="leavesListTab" class="panel section hidden admin-only">
       <div class="headrow">
-        <h2>Prehľad nahlásených PN a neprítomností</h2>
+        <h2>Kalendár PN a neprítomností (Všetci zamestnanci a admini)</h2>
         <button class="btn" onclick="openLeaveModal()">+ Pridať PN / Neprítomnosť</button>
       </div>
+
+      <!-- Vizuálny Kalendár PN -->
+      <div style="background:#f8faff;border:1px solid #cbd8ff;border-radius:10px;padding:16px;margin-bottom:20px">
+        <h3 style="margin-top:0;color:#204bb7;font-size:15px">📅 Prehľadný kalendár PN osôb</h3>
+        <div id="leavesCalendarMatrix" style="margin-top:10px"></div>
+      </div>
+
+      <h3>Zoznam všetkých záznamov PN</h3>
       <div class="tablewrap" id="leavesTable"></div>
     </div>
 
@@ -440,7 +448,7 @@
       $('pageTitle').textContent = ({
         calendar: 'Kalendár dielne',
         jobsList: 'Zoznam zákaziek',
-        leavesList: 'Zoznam PN a neprítomností',
+        leavesList: 'Kalendár PN a neprítomností',
         notes: 'Moje poznámky',
         tires: 'Sklad pneumatík',
         vehicles: 'Správa vozidiel',
@@ -506,11 +514,12 @@
       if (me.role !== 'admin') return;
       const list = data.leaves.sort((a,b) => (b.startDate||'').localeCompare(a.startDate||''));
 
+      // 1. Vykreslíme tabuľkový zoznam PN
       let rows = list.map(l => {
-        const m = mechanic(l.mechanicId);
+        const p = data.users.find(u => String(u.id) === String(l.mechanicId)) || mechanic(l.mechanicId);
         return `
           <tr>
-            <td><b>${esc(m.name || 'Neznámy mechanik')}</b></td>
+            <td><b>${esc(p.name || 'Neznáma osoba')}</b> <small class="muted">(${p.role === 'admin' ? 'Admin' : 'Mechanik'})</small></td>
             <td>${esc(l.reason || 'PN / Neprítomný')}</td>
             <td>${esc(l.startDate)}</td>
             <td>${esc(l.endDate)}</td>
@@ -525,7 +534,7 @@
         <table>
           <thead>
             <tr>
-              <th>Mechanik</th>
+              <th>Osoba (Mechanik / Admin)</th>
               <th>Dôvod / Typ</th>
               <th>Od dátumu</th>
               <th>Do dátumu</th>
@@ -537,6 +546,46 @@
           </tbody>
         </table>
       `;
+
+      // 2. Vykreslíme vizuálny Kalendár PN (prehľad aktuálneho mesiaca alebo najbližších dní)
+      renderLeavesCalendarMatrix(list);
+    }
+
+    function renderLeavesCalendarMatrix(leaves) {
+      const matrixEl = $('leavesCalendarMatrix');
+      if (!matrixEl) return;
+
+      if (!leaves || leaves.length === 0) {
+        matrixEl.innerHTML = '<div style="color:var(--muted);font-style:italic">V databáze nie sú žiadne naplánované PN ani neprítomnosti na zobrazenie v kalendári.</div>';
+        return;
+      }
+
+      // Zoskupíme PN podľa osôb
+      let byPerson = {};
+      leaves.forEach(l => {
+        const p = data.users.find(u => String(u.id) === String(l.mechanicId)) || mechanic(l.mechanicId);
+        const name = p.name || 'Neznáma osoba';
+        if (!byPerson[name]) byPerson[name] = [];
+        byPerson[name].push(l);
+      });
+
+      let html = '<div style="display:flex;flex-direction:column;gap:10px">';
+      for (let person in byPerson) {
+        html += `<div style="background:#fff;border:1px solid #d9deea;border-radius:8px;padding:10px 14px">
+          <div style="font-weight:700;color:var(--ink);margin-bottom:6px">👤 ${esc(person)}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">`;
+        
+        byPerson[person].forEach(l => {
+          html += `<span class="badge" style="background:#fff0f0;color:var(--red);border:1px solid #f5c6cb;padding:6px 10px;font-weight:600">
+            🚨 ${esc(l.reason)}: <b>${esc(l.startDate)}</b> až <b>${esc(l.endDate)}</b>
+          </span>`;
+        });
+
+        html += `</div></div>`;
+      }
+      html += '</div>';
+
+      matrixEl.innerHTML = html;
     }
 
     function renderAdminNotes() {
@@ -621,11 +670,11 @@
 
     function openLeaveModal() {
       const today = dateKey(new Date());
-      const mechOpts = data.mechanics.filter(m => m.role !== 'admin').map(m => `<option value="${m.id}">${esc(m.name)}</option>`).join('');
+      const allUsersOpts = data.users.map(u => `<option value="${u.id}">${esc(u.name)} (${u.role === 'admin' ? 'Admin' : 'Mechanik'})</option>`).join('');
 
-      openModal('Zadať PN / Neprítomnosť mechanika', `
+      openModal('Zadať PN / Neprítomnosť', `
         <div class="formgrid">
-          <div><label>Mechanik *</label><select id="lMechanic"><option value="">Vyber mechanika</option>${mechOpts}</select></div>
+          <div><label>Osoba *</label><select id="lMechanic"><option value="">Vyber osobu</option>${allUsersOpts}</select></div>
           <div><label>Dôvod / Typ *</label><input id="lReason" value="PN / Neprítomný"></div>
           <div><label>Od dátumu *</label><input id="lStart" type="date" value="${today}"></div>
           <div><label>Do dátumu (vrátane) *</label><input id="lEnd" type="date" value="${today}"></div>
@@ -643,7 +692,7 @@
         startDate: $('lStart').value,
         endDate: $('lEnd').value
       };
-      if(!l.mechanicId) { alert('Vyberte mechanika!'); return; }
+      if(!l.mechanicId) { alert('Vyberte osobu!'); return; }
       try {
         await call('saveLeave', token, l);
         closeModal();
@@ -682,8 +731,8 @@
         `<div class="calhead">${['Ne','Po','Ut','St','Št','Pi','So'][d.getDay()]}<br>${fmt(d)}</div>`
       ).join('');
 
-      const lunchStart = data.settings.lunchStart || '12:00';
-      const lunchEnd = data.settings.lunchEnd || '12:30';
+      const lunchStart = String(data.settings?.lunchStart || '12:00').substring(0, 5);
+      const lunchEnd = String(data.settings?.lunchEnd || '12:30').substring(0, 5);
 
       mechanics.forEach(m => {
         html += `<div class="calname"><span class="dot"></span>${esc(m.name)}</div>`;
@@ -704,7 +753,6 @@
               </div>
             `;
           } else {
-            // Zobrazíme obedňajšiu pauzu pre každý pracovný deň, ak je nastavená
             cellContent += `
               <div class="lunch-box">
                 🍽 Obed (${lunchStart} - ${lunchEnd})
@@ -982,16 +1030,17 @@
 
       let bookedIntervals = [];
       
-      // Automaticky pridáme obed do obsadených časov
-      const lunchStart = data.settings.lunchStart || '12:00';
-      const lunchEnd = data.settings.lunchEnd || '12:30';
-      bookedIntervals.push({ start: lunchStart, end: lunchEnd, task: 'Obedňajšia pauza' });
+      const lunchStart = String(data.settings?.lunchStart || '12:00').substring(0, 5);
+      const lunchEnd = String(data.settings?.lunchEnd || '12:30').substring(0, 5);
+      bookedIntervals.push({ start: lunchStart, end: lunchEnd, task: '🍽 Obedňajšia pauza' });
 
       if (mechId && dateVal) {
         data.jobs.forEach(job => {
           if (window.editingJobId && job.id === window.editingJobId) return;
           if (String(job.mechanicId) === String(mechId) && String(job.date) === String(dateVal)) {
-            bookedIntervals.push({ start: job.startTime || '08:00', end: job.endTime || '16:00', task: job.task });
+            let jStart = String(job.startTime || '08:00').substring(0, 5);
+            let jEnd = String(job.endTime || '16:00').substring(0, 5);
+            bookedIntervals.push({ start: jStart, end: jEnd, task: job.task });
           }
         });
       }
@@ -1006,7 +1055,17 @@
 
       TIME_OPTIONS.forEach(t => {
         let isBooked = bookedIntervals.some(b => t >= b.start && t < b.end);
-        let labelSuffix = isBooked ? ' ❌ [OBSADENÉ]' : '';
+        let matchLunch = (t >= lunchStart && t < lunchEnd);
+        let labelSuffix = '';
+        
+        if (isBooked || matchLunch) {
+          isBooked = true;
+          if (matchLunch) {
+            labelSuffix = ` 🍽 [OBSADENÉ – Obedňajšia pauza (${lunchStart} - ${lunchEnd})]`;
+          } else {
+            labelSuffix = ' 🚫 [OBSADENÉ]';
+          }
+        }
         
         startOpts += `<option value="${t}" ${t === selectedStart ? 'selected' : ''} ${isBooked ? 'style="color:red;background:#fff0f0"' : ''}>${t}${labelSuffix}</option>`;
         endOpts += `<option value="${t}" ${t === selectedEnd ? 'selected' : ''}>${t}</option>`;
@@ -1050,7 +1109,7 @@
 
       const onLeave = data.leaves.some(l => String(l.mechanicId) === String(mechId) && dateVal >= l.startDate && dateVal <= l.endDate);
       if(onLeave) {
-        if(!confirm('Upozornenie: Mechanik má v tento deň nahlásenú PN/neprítomność! Naozaj chcete napriek tomu pridať zákazku?')) return;
+        if(!confirm('Upozornenie: Mechanik má v tento deň nahlásenú PN/neprítomnosť! Naozaj chcete napriek tomu pridať zákazku?')) return;
       }
 
       const vehicleId = $('jVehicle').value;
@@ -1117,7 +1176,7 @@
       $('modalBack').classList.add('hidden'); 
     }
 
-    if (token) { loadData(); }
+    if (token) { loadDate(); }
   </script>
 </body>
 </html>
