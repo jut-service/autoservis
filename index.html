@@ -83,13 +83,6 @@
     .modalhead{display:flex;justify-content:space-between;align-items:center}
     .modalhead h2{margin:0}
     .modalactions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
-    
-    @media(max-width:700px){
-      .topbar{padding:0 14px}.wrap{padding:0 12px;margin:17px auto}
-      .stats{gap:7px}.stat{padding:12px}.stat .num{font-size:20px}
-      .headrow h1{font-size:21px}.grid2,.formgrid{grid-template-columns:1fr}
-      .span2{grid-column:auto}
-    }
   </style>
 </head>
 <body>
@@ -284,21 +277,16 @@
   </div>
 
   <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbyEBvRJZ-zP6OZBuSCwNHnIuDCtfat0S3jTeU-JVZMTUY4M0bXt1IWpHmLMJ8xvq8zfNw/exec";
+    // SEM VLOŽTE VAŠU AKTUÁLNU URL ADRESU Z GOOGLE APPS SCRIPTU
+    const API_URL = "SEM_ZAPISTE_VAŠU_APPS_SCRIPT_URL";
     
     let token = sessionStorage.getItem('as_token') || '';
     let me = null;
     let data = { users:[], mechanics:[], vehicles:[], jobs:[], tires:[], adminNotes:[], leaves:[], settings:{ lunchStart:'12:00', lunchEnd:'12:30' } };
     let weekStart = monday(new Date());
-    let activeTab = 'calendar';
 
     const STATUSES = ['Čaká na spracovanie', 'Rozpracované', 'Dokončené'];
-    
-    const TIME_OPTIONS = [
-      '07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', 
-      '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', 
-      '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00'
-    ];
+    const TIME_OPTIONS = ['07:00','07:30','08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00'];
 
     const $ = id => document.getElementById(id);
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -308,17 +296,9 @@
       try {
         let cleanStr = String(dStr).split('T')[0];
         let parts = cleanStr.split('-');
-        if (parts.length === 3) {
-          return parts[2] + '.' + parts[1] + '.' + parts[0];
-        }
-        let d = new Date(dStr);
-        if (!isNaN(d.getTime())) {
-          return String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + d.getFullYear();
-        }
+        if (parts.length === 3) return parts[2] + '.' + parts[1] + '.' + parts[0];
         return cleanStr;
-      } catch(e) {
-        return dStr;
-      }
+      } catch(e) { return dStr; }
     }
 
     function normalizeDateKey(dStr) {
@@ -326,28 +306,19 @@
       try {
         let cleanStr = String(dStr).split('T')[0];
         let parts = cleanStr.split('-');
-        if (parts.length === 3 && parts[0].length === 4) {
-          return cleanStr;
-        }
+        if (parts.length === 3 && parts[0].length === 4) return cleanStr;
         let d = new Date(dStr);
-        if (!isNaN(d.getTime())) {
-          return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-        }
+        if (!isNaN(d.getTime())) return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
         return cleanStr;
-      } catch(e) {
-        return String(dStr).substring(0, 10);
-      }
+      } catch(e) { return String(dStr).substring(0, 10); }
     }
 
-    // Pomocná funkcia na čisté vytiahnutie času (napr. 12:00) z akéhokoľvek obskúrneho reťazca
     function formatTimeOnly(tStr) {
       if (!tStr) return '';
       let s = String(tStr);
       if (s.includes('T')) {
         let timePart = s.split('T')[1];
-        if (timePart) {
-          return timePart.substring(0, 5);
-        }
+        if (timePart) return timePart.substring(0, 5);
       }
       return s.substring(0, 5);
     }
@@ -359,9 +330,7 @@
           body: JSON.stringify({ fn: name, args: args })
         });
         const res = await response.json();
-        if (res.status === 'error') {
-          throw new Error(res.message);
-        }
+        if (res.status === 'error') throw new Error(res.message);
         return res.data;
       } catch (e) {
         throw new Error(e.message || 'Chyba pri komunikácii so serverom.');
@@ -421,11 +390,12 @@
         showTab('calendar');
         renderAll();
       } catch(e) {
-        $('loginError').textContent = e.message;
+        console.error("Chyba pri načítaní dát:", e);
         token = '';
         sessionStorage.removeItem('as_token');
-        $('loginView').classList.add('hidden');
+        $('loginView').classList.remove('hidden');
         $('appView').classList.add('hidden');
+        $('loginError').textContent = 'Relácia vypršala alebo chyba pripojenia. Prihláste sa znova.';
       }
     }
 
@@ -442,15 +412,19 @@
     }
 
     function renderAll() {
-      renderCalendar();
-      if (me.role === 'admin') {
-        renderJobsList();
-        renderLeavesList();
-        renderAdminNotes();
+      try {
+        renderCalendar();
+        if (me && me.role === 'admin') {
+          renderJobsList();
+          renderLeavesList();
+          renderAdminNotes();
+        }
+        renderTires();
+        renderVehicles();
+        renderMechanics();
+      } catch (err) {
+        console.error("Chyba pri vykresľovaní prvkov:", err);
       }
-      renderTires();
-      renderVehicles();
-      renderMechanics();
     }
 
     function monday(d) {
@@ -475,7 +449,6 @@
     function goToday() { weekStart = monday(new Date()); renderCalendar(); }
 
     function showTab(tab) {
-      activeTab = tab;
       ['calendar', 'jobsList', 'leavesList', 'notes', 'tires', 'vehicles', 'mechanics', 'settings', 'password'].forEach(t => {
         const el = $(t + 'Tab');
         if (el) {
@@ -494,24 +467,12 @@
           b.classList.toggle('active', b.dataset.tab === tab);
         }
       });
-
-      $('pageTitle').textContent = ({
-        calendar: 'Kalendár dielne',
-        jobsList: 'Zoznam zákaziek',
-        leavesList: 'Zoznam PN a neprítomností',
-        notes: 'Moje poznámky',
-        tires: 'Sklad pneumatík',
-        vehicles: 'Správa vozidiel',
-        mechanics: 'Zoznam mechanikov',
-        settings: 'Nastavenia dielne',
-        password: 'Zmena hesla'
-      })[tab] || '';
     }
 
     function renderJobsList() {
-      if (me.role !== 'admin') return;
+      if (!me || me.role !== 'admin') return;
       const q = ($('jobSearch')?.value || '').toLowerCase();
-      const list = data.jobs.filter(j => {
+      const list = (data.jobs || []).filter(j => {
         const v = vehicle(j.vehicleId);
         const m = mechanic(j.mechanicId);
         const searchStr = (j.date + ' ' + (v.plate||'') + ' ' + (v.make||'') + ' ' + (v.model||'') + ' ' + (v.customer||'') + ' ' + (m.name||'') + ' ' + j.task + ' ' + j.status).toLowerCase();
@@ -533,156 +494,67 @@
                 ${STATUSES.map(s => `<option value="${s}" ${j.status === s ? 'selected' : ''}>${s}</option>`).join('')}
               </select>
             </td>
-            <td>
-              <button class="btn secondary small" onclick="editJob('${j.id}')">Upraviť</button>
-            </td>
+            <td><button class="btn secondary small" onclick="editJob('${j.id}')">Upraviť</button></td>
           </tr>
         `;
       }).join('');
 
-      $('jobsListTable').innerHTML = `
-        <table>
-          <thead>
-            <tr>
-              <th>Dátum</th>
-              <th>Vozidlo / ŠPZ</th>
-              <th>Mechanik</th>
-              <th>Čas</th>
-              <th>Popis práce</th>
-              <th>Stav</th>
-              <th>Akcia</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Žiadne zákazky v zozname.</td></tr>'}
-          </tbody>
-        </table>
-      `;
+      $('jobsListTable').innerHTML = `<table><thead><tr><th>Dátum</th><th>Vozidlo / ŠPZ</th><th>Mechanik</th><th>Čas</th><th>Popis práce</th><th>Stav</th><th>Akcia</th></tr></thead><tbody>${rows || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Žiadne zákazky v zozname.</td></tr>'}</tbody></table>`;
     }
 
     function renderLeavesList() {
-      if (me.role !== 'admin') return;
-      const list = data.leaves.sort((a,b) => (b.startDate||'').localeCompare(a.startDate||''));
-
+      if (!me || me.role !== 'admin') return;
+      const list = (data.leaves || []).sort((a,b) => (b.startDate||'').localeCompare(a.startDate||''));
       let calendarBoxHtml = '';
       if (list.length === 0) {
         calendarBoxHtml = '<div style="color:var(--muted);font-style:italic;padding:10px;">Žiadne aktívne PN ani neprítomnosti.</div>';
       } else {
         let byPerson = {};
         list.forEach(l => {
-          const p = (data.users || []).find(u => String(u.id) === String(l.mechanicId)) || mechanic(l.mechanicId);
+          const p = (data.users || data.mechanics || []).find(u => String(u.id) === String(l.mechanicId)) || mechanic(l.mechanicId);
           const name = p.name || 'Neznáma osoba';
-          const roleBadge = p.role === 'admin' ? 'Admin' : 'Mechanik';
-          if (!byPerson[name]) byPerson[name] = { role: roleBadge, items: [] };
+          if (!byPerson[name]) byPerson[name] = { role: p.role === 'admin' ? 'Admin' : 'Mechanik', items: [] };
           byPerson[name].items.push(l);
         });
-
         calendarBoxHtml = '<div style="display:flex;flex-direction:column;gap:10px;">';
         for (let person in byPerson) {
-          calendarBoxHtml += `
-            <div style="background:#fff;border:1px solid #d9deea;border-radius:8px;padding:10px 14px;">
-              <div style="font-weight:750;color:var(--ink);margin-bottom:6px;display:flex;align-items:center;gap:8px">
-                👤 ${esc(person)} <span class="badge" style="font-size:10px">${byPerson[person].role}</span>
-              </div>
-              <div style="display:flex;gap:6px;flex-wrap:wrap">
-          `;
+          calendarBoxHtml += `<div style="background:#fff;border:1px solid #d9deea;border-radius:8px;padding:10px 14px;"><div style="font-weight:750;color:var(--ink);margin-bottom:6px">👤 ${esc(person)}</div><div style="display:flex;gap:6px;flex-wrap:wrap">`;
           byPerson[person].items.forEach(l => {
-            calendarBoxHtml += `
-              <span class="badge" style="background:#fff0f0;color:var(--red);border:1px solid #f5c6cb;padding:6px 10px;font-weight:600;display:inline-flex;align-items:center;gap:6px">
-                🚨 ${esc(l.reason)}: <b>${esc(formatDate(l.startDate))}</b> až <b>${esc(formatDate(l.endDate))}</b>
-                <button class="btn danger small" style="padding:2px 6px;font-size:10px;margin-left:4px" onclick="removeLeave('${l.id}')">✕</button>
-              </span>
-            `;
+            calendarBoxHtml += `<span class="badge" style="background:#fff0f0;color:var(--red);border:1px solid #f5c6cb;padding:6px 10px;font-weight:600">🚨 ${esc(l.reason)}: <b>${esc(formatDate(l.startDate))}</b> až <b>${esc(formatDate(l.endDate))}</b> <button class="btn danger small" style="padding:2px 6px;font-size:10px;margin-left:4px" onclick="removeLeave('${l.id}')">✕</button></span>`;
           });
           calendarBoxHtml += `</div></div>`;
         }
         calendarBoxHtml += '</div>';
       }
-
       $('leavesCalendarMatrix').innerHTML = calendarBoxHtml;
 
       let rows = list.map(l => {
-        const p = (data.users || []).find(u => String(u.id) === String(l.mechanicId)) || mechanic(l.mechanicId);
-        return `
-          <tr>
-            <td><b>${esc(p.name || 'Neznáma osoba')}</b> <small class="muted">(${p.role === 'admin' ? 'Admin' : 'Mechanik'})</small></td>
-            <td>${esc(l.reason || 'PN / Neprítomný')}</td>
-            <td>${esc(formatDate(l.startDate))}</td>
-            <td>${esc(formatDate(l.endDate))}</td>
-            <td>
-              <button class="btn danger small" onclick="removeLeave('${l.id}')">Zrušiť</button>
-            </td>
-          </tr>
-        `;
+        const p = (data.users || data.mechanics || []).find(u => String(u.id) === String(l.mechanicId)) || mechanic(l.mechanicId);
+        return `<tr><td><b>${esc(p.name || 'Neznáma osoba')}</b></td><td>${esc(l.reason || 'PN')}</td><td>${esc(formatDate(l.startDate))}</td><td>${esc(formatDate(l.endDate))}</td><td><button class="btn danger small" onclick="removeLeave('${l.id}')">Zrušiť</button></td></tr>`;
       }).join('');
-
-      $('leavesTable').innerHTML = `
-        <table>
-          <thead>
-            <tr>
-              <th>Osoba (Mechanik / Admin)</th>
-              <th>Dôvod / Typ</th>
-              <th>Od dátumu</th>
-              <th>Do dátumu</th>
-              <th>Akcia</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows || '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--muted)">Žiadne aktívne PN ani neprítomnosti.</td></tr>'}
-          </tbody>
-        </table>
-      `;
+      $('leavesTable').innerHTML = `<table><thead><tr><th>Osoba</th><th>Dôvod</th><th>Od</th><th>Do</th><th>Akcia</th></tr></thead><tbody>${rows || '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--muted)">Žiadne PN.</td></tr>'}</tbody></table>`;
     }
 
     function renderAdminNotes() {
-      if (me.role !== 'admin') return;
-      let rows = data.adminNotes.sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(n => `
+      if (!me || me.role !== 'admin') return;
+      let rows = (data.adminNotes || []).sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(n => `
         <tr>
           <td><b>${esc(formatDate(n.date))}</b></td>
           <td><span style="${n.done ? 'text-decoration:line-through;color:var(--muted)' : ''}">${esc(n.text)}</span></td>
           <td><span class="badge ${n.done ? 'done' : 'todo'}">${n.done ? 'Vybavené' : 'Aktívne'}</span></td>
-          <td>
-            <button class="btn secondary small" onclick="openAdminNoteModal('${n.id}')">Upraviť</button>
-          </td>
+          <td><button class="btn secondary small" onclick="openAdminNoteModal('${n.id}')">Upraviť</button></td>
         </tr>
       `).join('');
-
-      $('notesTable').innerHTML = `
-        <table>
-          <thead>
-            <tr>
-              <th>Dátum</th>
-              <th>Pripomenutie / Poznámka</th>
-              <th>Stav</th>
-              <th>Akcia</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows || '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted)">Žiadne poznámky. Pridajte si prvú.</td></tr>'}
-          </tbody>
-        </table>
-      `;
+      $('notesTable').innerHTML = `<table><thead><tr><th>Dátum</th><th>Poznámka</th><th>Stav</th><th>Akcia</th></tr></thead><tbody>${rows || '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted)">Žiadne poznámky.</td></tr>'}</tbody></table>`;
     }
 
     function openAdminNoteModal(id = '') {
-      const n = data.adminNotes.find(item => item.id === id) || { date: dateKey(new Date()) };
+      const n = (data.adminNotes || []).find(item => item.id === id) || { date: dateKey(new Date()) };
       openModal(id ? 'Upraviť poznámku' : 'Pridať novú poznámku', `
         <div class="formgrid">
-          <div>
-            <label>Dátum *</label>
-            <input id="noteDate" type="date" value="${esc(normalizeDateKey(n.date || ''))}">
-          </div>
-          <div>
-            <label>Stav</label>
-            <select id="noteDone">
-              <option value="false" ${!n.done ? 'selected' : ''}>Aktívne</option>
-              <option value="true" ${n.done ? 'selected' : ''}>Vybavené</option>
-            </select>
-          </div>
-          <div class="span2">
-            <label>Poznámka / Čo netreba zabudnúť *</label>
-            <textarea id="noteText" placeholder="Napr. objednať olej, zavolať dodávateľovi...">${esc(n.text || '')}</textarea>
-          </div>
+          <div><label>Dátum *</label><input id="noteDate" type="date" value="${esc(normalizeDateKey(n.date || ''))}"></div>
+          <div><label>Stav</label><select id="noteDone"><option value="false" ${!n.done ? 'selected' : ''}>Aktívne</option><option value="true" ${n.done ? 'selected' : ''}>Vybavené</option></select></div>
+          <div class="span2"><label>Poznámka *</label><textarea id="noteText">${esc(n.text || '')}</textarea></div>
         </div>
         <div class="modalactions">
           ${id ? `<button class="btn danger" onclick="removeAdminNote('${id}')">Odstrániť</button>` : ''}
@@ -692,92 +564,60 @@
     }
 
     async function saveAdminNoteForm(id) {
-      const noteData = {
-        id: id || undefined,
-        date: $('noteDate').value,
-        text: $('noteText').value,
-        done: $('noteDone').value === 'true'
-      };
       try {
-        await call('saveAdminNote', token, noteData);
+        await call('saveAdminNote', token, { id: id || undefined, date: $('noteDate').value, text: $('noteText').value, done: $('noteDone').value === 'true' });
         closeModal();
         await loadData();
       } catch(e) { alert(e.message); }
     }
 
     async function removeAdminNote(id) {
-      if(!confirm('Naozaj vymazať túto poznámku?')) return;
-      try {
-        await call('deleteAdminNote', token, id);
-        closeModal();
-        await loadData();
-      } catch(e) { alert(e.message); }
+      if(!confirm('Vymazať poznámku?')) return;
+      try { await call('deleteAdminNote', token, id); closeModal(); await loadData(); } catch(e) { alert(e.message); }
     }
 
     function openLeaveModal() {
       const today = dateKey(new Date());
-      const allUsersOpts = (data.users || data.mechanics || []).map(u => `<option value="${u.id}">${esc(u.name)} (${u.role === 'admin' ? 'Admin' : 'Mechanik'})</option>`).join('');
-
+      let allMechs = data.mechanics.length > 0 ? data.mechanics : data.users;
+      const allUsersOpts = allMechs.map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('');
       openModal('Zadať PN / Neprítomnosť', `
         <div class="formgrid">
           <div><label>Osoba *</label><select id="lMechanic"><option value="">Vyber osobu</option>${allUsersOpts}</select></div>
-          <div><label>Dôvod / Typ *</label><input id="lReason" value="PN / Neprítomný"></div>
-          <div><label>Od dátumu *</label><input id="lStart" type="date" value="${today}"></div>
-          <div><label>Do dátumu (vrátane) *</label><input id="lEnd" type="date" value="${today}"></div>
+          <div><label>Dôvod *</label><input id="lReason" value="PN / Neprítomný"></div>
+          <div><label>Od *</label><input id="lStart" type="date" value="${today}"></div>
+          <div><label>Do *</label><input id="lEnd" type="date" value="${today}"></div>
         </div>
-        <div class="modalactions">
-          <button class="btn" onclick="saveLeaveForm()">Uložiť PN / Neprítomnosť</button>
-        </div>
+        <div class="modalactions"><button class="btn" onclick="saveLeaveForm()">Uložiť</button></div>
       `);
     }
 
     async function saveLeaveForm() {
-      const l = {
-        mechanicId: $('lMechanic').value,
-        reason: $('lReason').value,
-        startDate: $('lStart').value,
-        endDate: $('lEnd').value
-      };
-      if(!l.mechanicId) { alert('Vyberte osobu!'); return; }
       try {
-        await call('saveLeave', token, l);
+        await call('saveLeave', token, { mechanicId: $('lMechanic').value, reason: $('lReason').value, startDate: $('lStart').value, endDate: $('lEnd').value });
         closeModal();
         await loadData();
       } catch(e) { alert(e.message); }
     }
 
     async function removeLeave(id) {
-      if(!confirm('Zrušiť záznam o PN / neprítomnosti?')) return;
-      try {
-        await call('deleteLeave', token, id);
-        closeModal();
-        await loadData();
-      } catch(e) { alert(e.message); }
+      if(!confirm('Zrušiť záznam?')) return;
+      try { await call('deleteLeave', token, id); closeModal(); await loadData(); } catch(e) { alert(e.message); }
     }
 
-    function vehicle(id) { return data.vehicles.find(v => v.id === id) || {}; }
-    function mechanic(id) { return data.mechanics.find(m => String(m.id) === String(id)) || data.users.find(u => String(u.id) === String(id)) || {}; }
+    function vehicle(id) { return (data.vehicles || []).find(v => v.id === id) || {}; }
+    function mechanic(id) { return (data.mechanics || []).find(m => String(m.id) === String(id)) || (data.users || []).find(u => String(u.id) === String(id)) || {}; }
 
     function renderCalendar() {
       const days = Array.from({length:7}, (_,i) => plusDays(weekStart, i));
       const end = plusDays(weekStart, 6);
       $('weekLabel').textContent = fmt(weekStart) + ' – ' + fmt(end) + ' ' + end.getFullYear();
 
-      // Bezpečné získanie mechanikov (skontroluje mechanics, ak prázdne, siahne do users, resp. zoberie všetkých ne-adminov)
       let mechanics = (data.mechanics || []).filter(m => m.role !== 'admin');
-      if (mechanics.length === 0 && data.users) {
-        mechanics = data.users.filter(u => u.role !== 'admin');
-      }
-      if (mechanics.length === 0 && data.users) {
-        mechanics = data.users;
-      }
-      if (mechanics.length === 0 && data.mechanics) {
-        mechanics = data.mechanics;
-      }
+      if (mechanics.length === 0 && data.users) mechanics = data.users.filter(u => u.role !== 'admin');
+      if (mechanics.length === 0 && data.users) mechanics = data.users;
 
       const startKey = dateKey(weekStart);
       const endKey = dateKey(end);
-      
       const jobs = (data.jobs || []).filter(j => {
         let dKey = normalizeDateKey(j.date);
         return dKey >= startKey && dKey <= endKey;
@@ -787,59 +627,37 @@
       $('statMechanics').textContent = mechanics.length;
       $('statDone').textContent = jobs.filter(j => j.status === 'Dokončené').length;
 
-      let html = '<div class="calhead">Mechanik</div>' + days.map(d => 
-        `<div class="calhead">${['Ne','Po','Ut','St','Št','Pi','So'][d.getDay()]}<br>${fmt(d)}</div>`
-      ).join('');
-
-      const lunchStart = formatTimeOnly(data.settings.lunchStart) || '12:00';
-      const lunchEnd = formatTimeOnly(data.settings.lunchEnd) || '12:30';
+      let html = '<div class="calhead">Mechanik</div>' + days.map(d => `<div class="calhead">${['Ne','Po','Ut','St','Št','Pi','So'][d.getDay()]}<br>${fmt(d)}</div>`).join('');
+      const lunchStart = formatTimeOnly(data.settings?.lunchStart) || '12:00';
+      const lunchEnd = formatTimeOnly(data.settings?.lunchEnd) || '12:30';
 
       if (mechanics.length === 0) {
-        html += `<div style="grid-column: 1 / -1; padding: 20px; text-align: center; color: var(--muted);">V systéme nie sú zatiaľ pridaní žiadni mechanici. Pridajte ich v záložke Mechanici.</div>`;
+        html += `<div style="grid-column: 1 / -1; padding: 20px; text-align: center; color: var(--muted);">V systéme nie sú zatiaľ pridaní žiadni mechanici.</div>`;
       }
 
       mechanics.forEach(m => {
         html += `<div class="calname"><span class="dot"></span>${esc(m.name)}</div>`;
         days.forEach(d => {
           const ds = dateKey(d);
-          
-          const leave = (data.leaves || []).find(l => {
-            if (String(l.mechanicId) !== String(m.id)) return false;
-            let lStart = normalizeDateKey(l.startDate);
-            let lEnd = normalizeDateKey(l.endDate);
-            return ds >= lStart && ds <= lEnd;
-          });
-
+          const leave = (data.leaves || []).find(l => String(l.mechanicId) === String(m.id) && ds >= normalizeDateKey(l.startDate) && ds <= normalizeDateKey(l.endDate));
           const list = jobs.filter(j => String(j.mechanicId) === String(m.id) && normalizeDateKey(j.date) === ds);
           list.sort((a,b) => (formatTimeOnly(a.startTime)||'').localeCompare(formatTimeOnly(b.startTime)||''));
 
           let cellContent = '';
-          
           if (leave) {
-            cellContent += `
-              <div class="leave-box">
-                🚨 ${esc(leave.reason || 'PN / Neprítomný')}
-                ${me.role === 'admin' ? `<button class="btn danger small" style="margin-top:6px;width:100%" onclick="removeLeave('${leave.id}')">Zrušiť PN</button>` : ''}
-              </div>
-            `;
+            cellContent += `<div class="leave-box">🚨 ${esc(leave.reason || 'PN')} ${me && me.role === 'admin' ? `<button class="btn danger small" style="margin-top:6px;width:100%" onclick="removeLeave('${leave.id}')">Zrušiť</button>` : ''}</div>`;
           } else {
-            cellContent += `
-              <div class="lunch-box">
-                🍽 Obed (${lunchStart} - ${lunchEnd})
-              </div>
-            `;
+            cellContent += `<div class="lunch-box">🍽 Obed (${lunchStart} - ${lunchEnd})</div>`;
           }
 
           if (list.length > 0) {
             cellContent += list.map(j => jobCard(j)).join('');
           } else if (!leave) {
-            cellContent += '<span class="empty">Bez ďalšieho plánu</span>';
+            cellContent += '<span class="empty">Bez plánu</span>';
           }
-
           html += `<div class="calcell">${cellContent}</div>`;
         });
       });
-
       $('calendarGrid').innerHTML = html;
     }
 
@@ -850,146 +668,65 @@
           <strong>${esc(v.plate || 'Bez ŠPZ')} · ${esc((v.make || '') + ' ' + (v.model || ''))}</strong>
           <div class="time">⏱ ${esc(formatTimeOnly(j.startTime) || '08:00')} - ${esc(formatTimeOnly(j.endTime) || '16:00')}</div>
           <div class="task-desc"><b>Popis:</b> ${esc(j.task)}</div>
-          
           <div style="margin-top:6px">
             <select class="status-select" onchange="statusChange('${j.id}', this.value)">
               ${STATUSES.map(s => `<option value="${s}" ${j.status === s ? 'selected' : ''}>${s}</option>`).join('')}
             </select>
           </div>
-
-          ${me.role === 'admin' ? `<button class="btn secondary small" style="margin-top:6px;width:100%" onclick="editJob('${j.id}')">Upraviť detail</button>` : ''}
+          ${me && me.role === 'admin' ? `<button class="btn secondary small" style="margin-top:6px;width:100%" onclick="editJob('${j.id}')">Upraviť</button>` : ''}
         </div>
       `;
     }
 
     function renderTires() {
       const q = ($('tireSearch')?.value || '').toLowerCase();
-      const list = data.tires.filter(t => {
+      const list = (data.tires || []).filter(t => {
         const v = vehicle(t.vehicleId);
-        const searchStr = (t.customerName + ' ' + t.plate + ' ' + (v.plate||'') + ' ' + t.dimension + ' ' + t.location).toLowerCase();
-        return searchStr.includes(q);
+        return (t.customerName + ' ' + t.plate + ' ' + (v.plate||'') + ' ' + t.dimension + ' ' + t.location).toLowerCase().includes(q);
       });
-
       let rows = list.map(t => {
         const v = vehicle(t.vehicleId);
-        const plate = t.plate || v.plate || '-';
-        return `
-          <tr>
-            <td><b>${esc(t.customerName || v.customer || 'Neznámy')}</b></td>
-            <td><b>${esc(plate)}</b></td>
-            <td>${esc(t.dimension)}</td>
-            <td><span class="badge todo">${esc(t.location || 'Regál ?')}</span></td>
-            <td>${esc(t.condition || 'N/A')}</td>
-            <td>${esc(t.note || '-')}</td>
-            <td>
-              <button class="btn secondary small" onclick="openTireModal('${t.id}')">Upraviť</button>
-            </td>
-          </tr>
-        `;
+        return `<tr><td><b>${esc(t.customerName || v.customer || '-')}</b></td><td><b>${esc(t.plate || v.plate || '-')}</b></td><td>${esc(t.dimension)}</td><td><span class="badge todo">${esc(t.location)}</span></td><td>${esc(t.condition)}</td><td>${esc(t.note)}</td><td><button class="btn secondary small" onclick="openTireModal('${t.id}')">Upraviť</button></td></tr>`;
       }).join('');
-
-      $('tiresTable').innerHTML = `
-        <table>
-          <thead>
-            <tr>
-              <th>Zákazník</th>
-              <th>ŠPZ</th>
-              <th>Rozmer / Typ</th>
-              <th>Uloženie (Regál/Pozícia)</th>
-              <th>Stav pneu</th>
-              <th>Poznámka</th>
-              <th>Akcia</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Žiadne uskladnené pneumatiky.</td></tr>'}
-          </tbody>
-        </table>
-      `;
+      $('tiresTable').innerHTML = `<table><thead><tr><th>Zákazník</th><th>ŠPZ</th><th>Rozmer</th><th>Uloženie</th><th>Stav</th><th>Poznámka</th><th>Akcia</th></tr></thead><tbody>${rows || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Žiadne pneu.</td></tr>'}</tbody></table>`;
     }
 
     function openTireModal(id = '') {
-      const t = data.tires.find(item => item.id === id) || {};
-      const vehicleOpts = data.vehicles.map(v => `<option value="${v.id}" ${t.vehicleId === v.id ? 'selected' : ''}>${esc(v.plate)} - ${esc(v.customer)}</option>`).join('');
-
-      openModal(id ? 'Upraviť pneu v sklade' : 'Uložiť pneumatiky do skladu', `
+      const t = (data.tires || []).find(item => item.id === id) || {};
+      const vehicleOpts = (data.vehicles || []).map(v => `<option value="${v.id}" ${t.vehicleId === v.id ? 'selected' : ''}>${esc(v.plate)} - ${esc(v.customer)}</option>`).join('');
+      openModal(id ? 'Upraviť pneu' : 'Uložiť pneumatiky', `
         <div class="formgrid">
-          <div>
-            <label>Zákazník / Meno *</label>
-            <input id="tCustomer" value="${esc(t.customerName || '')}" placeholder="Meno a priezvisko">
-          </div>
-          <div>
-            <label>ŠPZ Vozidla</label>
-            <input id="tPlate" value="${esc(t.plate || '')}" placeholder="BL123XX">
-          </div>
-          <div class="span2">
-            <label>Priradiť k evidovanému vozidlu (voliteľné)</label>
-            <select id="tVehicleId"><option value="">-- Vyber vozidlo z databázy --</option>${vehicleOpts}</select>
-          </div>
-          <div>
-            <label>Rozmer a značka pneu *</label>
-            <input id="tDimension" value="${esc(t.dimension || '')}" placeholder="např. 205/55 R16 Continental">
-          </div>
-          <div>
-            <label>Umiestnenie v sklade *</label>
-            <input id="tLocation" value="${esc(t.location || '')}" placeholder="např. Regál A2 - Pozícia 4">
-          </div>
-          <div>
-            <label>Stav pneu / Dezen</label>
-            <input id="tCondition" value="${esc(t.condition || '')}" placeholder="např. 6mm, Letné, AL disky">
-          </div>
-          <div class="span2">
-            <label>Poznámka</label>
-            <textarea id="tNote">${esc(t.note || '')}</textarea>
-          </div>
+          <div><label>Zákazník *</label><input id="tCustomer" value="${esc(t.customerName || '')}"></div>
+          <div><label>ŠPZ</label><input id="tPlate" value="${esc(t.plate || '')}"></div>
+          <div class="span2"><label>Vozidlo zo zoznamu</label><select id="tVehicleId"><option value="">-- Vyber --</option>${vehicleOpts}</select></div>
+          <div><label>Rozmer *</label><input id="tDimension" value="${esc(t.dimension || '')}"></div>
+          <div><label>Umiestnenie *</label><input id="tLocation" value="${esc(t.location || '')}"></div>
+          <div><label>Stav</label><input id="tCondition" value="${esc(t.condition || '')}"></div>
+          <div class="span2"><label>Poznámka</label><textarea id="tNote">${esc(t.note || '')}</textarea></div>
         </div>
         <div class="modalactions">
-          ${id ? `<button class="btn danger" onclick="removeTire('${id}')">Odstrániť zo skladu</button>` : ''}
-          <button class="btn" onclick="saveTireForm('${id}')">Uložiť záznam</button>
+          ${id ? `<button class="btn danger" onclick="removeTire('${id}')">Odstrániť</button>` : ''}
+          <button class="btn" onclick="saveTireForm('${id}')">Uložiť</button>
         </div>
       `);
     }
 
     async function saveTireForm(id) {
-      const tireData = {
-        id: id || undefined,
-        customerName: $('tCustomer').value,
-        plate: $('tPlate').value,
-        vehicleId: $('tVehicleId').value,
-        dimension: $('tDimension').value,
-        location: $('tLocation').value,
-        condition: $('tCondition').value,
-        note: $('tNote').value
-      };
       try {
-        await call('saveTire', token, tireData);
-        closeModal();
-        await loadData();
+        await call('saveTire', token, { id: id || undefined, customerName: $('tCustomer').value, plate: $('tPlate').value, vehicleId: $('tVehicleId').value, dimension: $('tDimension').value, location: $('tLocation').value, condition: $('tCondition').value, note: $('tNote').value });
+        closeModal(); await loadData();
       } catch(e) { alert(e.message); }
     }
 
     async function removeTire(id) {
-      if(!confirm('Naozaj chcete vymazať pneumatiky zo skladu?')) return;
-      try {
-        await call('deleteTire', token, id);
-        closeModal();
-        await loadData();
-      } catch(e) { alert(e.message); }
+      if(!confirm('Vymazať?')) return;
+      try { await call('deleteTire', token, id); closeModal(); await loadData(); } catch(e) { alert(e.message); }
     }
 
     function renderVehicles() {
-      if (me.role !== 'admin') return;
-      let rows = data.vehicles.map(v => `
-        <tr>
-          <td><b>${esc(v.plate)}</b></td>
-          <td>${esc(v.make)} ${esc(v.model)}</td>
-          <td>${esc(v.customer)}</td>
-          <td>${esc(v.phone)}</td>
-          <td>${esc(v.note)}</td>
-          <td><button class="btn secondary small" onclick="editVehicle('${v.id}')">Upraviť</button></td>
-        </tr>
-      `).join('');
-      $('vehicleTable').innerHTML = `<table><thead><tr><th>ŠPZ</th><th>Vozidlo</th><th>Zákazník</th><th>Telefón</th><th>Poznámka</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="6">Zatiaľ nie sú pridané vozidlá.</td></tr>'}</tbody></table>`;
+      if (!me || me.role !== 'admin') return;
+      let rows = (data.vehicles || []).map(v => `<tr><td><b>${esc(v.plate)}</b></td><td>${esc(v.make)} ${esc(v.model)}</td><td>${esc(v.customer)}</td><td>${esc(v.phone)}</td><td><button class="btn secondary small" onclick="editVehicle('${v.id}')">Upraviť</button></td></tr>`).join('');
+      $('vehicleTable').innerHTML = `<table><thead><tr><th>ŠPZ</th><th>Model</th><th>Zákazník</th><th>Tel.</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5">Žiadne vozidlá.</td></tr>'}</tbody></table>`;
     }
 
     function openVehicle(v={}) {
@@ -1002,272 +739,129 @@
           <div><label>Telefón</label><input id="vPhone" value="${esc(v.phone||'')}"></div>
           <div class="span2"><label>Poznámka</label><textarea id="vNote">${esc(v.note||'')}</textarea></div>
         </div>
-        <div class="modalactions">
-          ${v.id ? `<button class="btn danger" onclick="removeVehicle('${v.id}')">Odstrániť</button>` : ''}
-          <button class="btn" onclick="saveVehicleForm('${v.id||''}')">Uložiť</button>
-        </div>
+        <div class="modalactions">${v.id ? `<button class="btn danger" onclick="removeVehicle('${v.id}')">Odstrániť</button>` : ''}<button class="btn" onclick="saveVehicleForm('${v.id||''}')">Uložiť</button></div>
       `);
     }
     function editVehicle(id) { openVehicle(vehicle(id)); }
     async function saveVehicleForm(id) {
-      const v = { id: id||undefined, plate:$('vPlate').value, make:$('vMake').value, model:$('vModel').value, customer:$('vCustomer').value, phone:$('vPhone').value, note:$('vNote').value };
-      try { await call('saveVehicle', token, v); closeModal(); await loadData(); } catch(e) { alert(e.message); }
+      try { await call('saveVehicle', token, { id: id||undefined, plate:$('vPlate').value, make:$('vMake').value, model:$('vModel').value, customer:$('vCustomer').value, phone:$('vPhone').value, note:$('vNote').value }); closeModal(); await loadData(); } catch(e) { alert(e.message); }
     }
     async function removeVehicle(id) {
-      if(!confirm('Naozaj odstrániť vozidlo?')) return;
+      if(!confirm('Vymazať?')) return;
       try { await call('deleteVehicle', token, id); closeModal(); await loadData(); } catch(e) { alert(e.message); }
     }
 
     function renderMechanics() {
-      if (me.role !== 'admin') return;
+      if (!me || me.role !== 'admin') return;
       let mechList = data.mechanics.length > 0 ? data.mechanics : data.users;
-      let rows = mechList.map(m => `
-        <tr>
-          <td><b>${esc(m.name)}</b></td>
-          <td>${esc(m.username)}</td>
-          <td><span class="badge">${esc(m.role || 'mechanic')}</span></td>
-          <td><button class="btn secondary small" onclick="editMechanic('${m.id}')">Upraviť</button></td>
-        </tr>
-      `).join('');
-      $('mechanicTable').innerHTML = `<table><thead><tr><th>Meno</th><th>Prihlasovacie meno</th><th>Rola</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="4">Zatiaľ nie sú pridaní mechanici.</td></tr>'}</tbody></table>`;
+      let rows = mechList.map(m => `<tr><td><b>${esc(m.name)}</b></td><td>${esc(m.username)}</td><td><span class="badge">${esc(m.role || 'mechanic')}</span></td><td><button class="btn secondary small" onclick="editMechanic('${m.id}')">Upraviť</button></td></tr>`).join('');
+      $('mechanicTable').innerHTML = `<table><thead><tr><th>Meno</th><th>Login</th><th>Rola</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="4">Žiadni mechanici.</td></tr>'}</tbody></table>`;
     }
 
     function openMechanic(m={}) {
       openModal(m.id ? 'Upraviť mechanika' : 'Pridať mechanika', `
-        <label>Meno mechanika *</label><input id="mName" value="${esc(m.name||'')}">
-        <label>Prihlasovacie meno *</label><input id="mUser" value="${esc(m.username||'')}">
-        <label>${m.id ? 'Nové heslo (nechaj prázdne, ak sa nemení)' : 'Heslo (min. 8 znakov) *'}</label><input id="mPass" type="password">
+        <label>Meno *</label><input id="mName" value="${esc(m.name||'')}">
+        <label>Login *</label><input id="mUser" value="${esc(m.username||'')}">
+        <label>Heslo</label><input id="mPass" type="password">
         <div class="modalactions"><button class="btn" onclick="saveMechanicForm('${m.id||''}')">Uložiť</button></div>
       `);
     }
-    function editMechanic(id) { 
-      let m = data.mechanics.find(item => String(item.id) === String(id)) || data.users.find(item => String(item.id) === String(id));
-      openMechanic(m || {}); 
+    function editMechanic(id) {
+      let m = (data.mechanics || []).find(item => String(item.id) === String(id)) || (data.users || []).find(item => String(item.id) === String(id));
+      openMechanic(m || {});
     }
     async function saveMechanicForm(id) {
       try { await call('saveMechanic', token, { id: id||undefined, name:$('mName').value, username:$('mUser').value, password:$('mPass').value }); closeModal(); await loadData(); } catch(e) { alert(e.message); }
     }
 
     function openJob(j={}) {
-      if (me.role !== 'admin') return;
+      if (!me || me.role !== 'admin') return;
       const today = dateKey(new Date());
-      const vehicleOpts = data.vehicles.map(v => `<option value="${v.id}" ${j.vehicleId===v.id?'selected':''}>${esc(v.plate)} – ${esc(v.make)} ${esc(v.model)} (${esc(v.customer)})</option>`).join('');
-      
-      // Bezpečné naplnenie zoznamu mechanikov (zohľadní mechanikov aj všetkých používateľov)
+      const vehicleOpts = (data.vehicles || []).map(v => `<option value="${v.id}" ${j.vehicleId===v.id?'selected':''}>${esc(v.plate)} – ${esc(v.customer)}</option>`).join('');
       let allMechs = data.mechanics.length > 0 ? data.mechanics : data.users;
       const mechOpts = allMechs.map(m => `<option value="${m.id}" ${String(j.mechanicId)===String(m.id)?'selected':''}>${esc(m.name)}</option>`).join('');
 
-      openModal(j.id ? 'Upraviť zákazku' : 'Naplánovať vozidlo', `
+      openModal(j.id ? 'Upraviť zákazku' : 'Naplánovať zákazku', `
         <div class="formgrid">
           <div><label>Dátum *</label><input id="jDate" type="date" value="${esc(normalizeDateKey(j.date||today))}" onchange="updateJobChecks()"></div>
-          <div><label>Mechanik *</label><select id="jMechanic" onchange="updateJobChecks()"><option value="">Vyber mechanika</option>${mechOpts}</select></div>
-          
-          <div class="span2" id="leaveWarning" style="background:#fff0f0;color:#c0393d;padding:10px;border-radius:6px;border:1px solid #f5c6cb;display:none;font-weight:600;margin-top:6px">
-            ⚠️ Pozor: Tento mechanik má v daný deň nahlásenú PN / neprítomnosť!
-          </div>
-
-          <div class="span2" id="busyTimesInfo" style="background:#f8faff;color:#204bb7;padding:10px;border-radius:6px;border:1px solid #cbd8ff;font-size:12px;margin-top:6px">
-            <b>Obsadené časy tohto mechanika (vrátane obeda):</b> <span id="busyTimesList" style="font-style:italic">žiadne</span>
-          </div>
-
-          <div class="span2" style="background:#f8faff;padding:12px;border-radius:8px;border:1px solid #d9deea;margin-top:6px">
-            <label style="margin-top:0">1. Vybrať existujúce vozidlo zo zoznamu:</label>
-            <select id="jVehicle"><option value="">-- Alebo vyber z existujúcich --</option>${vehicleOpts}</select>
-            
-            <div style="margin-top:10px;font-size:12px;color:var(--muted);font-weight:700">ALEBO ZAPÍSAŤ NOVÉ VOZIDLO PRIAMO TU:</div>
-            <div class="formgrid" style="margin-top:6px">
-              <div><label>Nová ŠPZ *</label><input id="jNewPlate" placeholder="např. ZA123BC"></div>
-              <div><label>Značka a model</label><input id="jNewMake" placeholder="např. Škoda Octavia"></div>
-              <div class="span2"><label>Meno zákazníka</label><input id="jNewCustomer" placeholder="Ján Mrkvovička"></div>
+          <div><label>Mechanik *</label><select id="jMechanic" onchange="updateJobChecks()"><option value="">Vyber</option>${mechOpts}</select></div>
+          <div class="span2" id="leaveWarning" style="background:#fff0f0;color:#c0393d;padding:10px;border-radius:6px;display:none;font-weight:600">⚠️ Mechanik má v tento deň PN!</div>
+          <div class="span2" style="background:#f8faff;padding:12px;border-radius:8px;border:1px solid #d9deea">
+            <label style="margin-top:0">Existujúce vozidlo:</label><select id="jVehicle"><option value="">-- Vyber --</option>${vehicleOpts}</select>
+            <div style="margin-top:8px;font-weight:700;font-size:12px">ALEbo NOVÁ ŠPZ:</div>
+            <div class="formgrid" style="margin-top:4px">
+              <div><input id="jNewPlate" placeholder="Napr. ZA123BC"></div>
+              <div><input id="jNewMake" placeholder="Značka/model"></div>
             </div>
+            <input id="jNewCustomer" placeholder="Meno zákazníka" style="margin-top:8px">
           </div>
-
           <div><label>Stav</label><select id="jStatus">${STATUSES.map(s => `<option ${j.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
-          <div><label>Čas od - do</label>
-            <div style="display:flex;gap:6px">
-              <select id="jStart"></select>
-              <select id="jEnd"></select>
-            </div>
-          </div>
-          <div class="span2"><label>Popis práce *</label><textarea id="jTask">${esc(j.task||'')}</textarea></div>
+          <div><label>Čas</label><div style="display:flex;gap:6px"><select id="jStart"></select><select id="jEnd"></select></div></div>
+          <div class="span2"><label>Popis *</label><textarea id="jTask">${esc(j.task||'')}</textarea></div>
         </div>
-        <div class="modalactions">
-          ${j.id ? `<button class="btn danger" onclick="removeJob('${j.id}')">Odstrániť</button>` : ''}
-          <button class="btn" onclick="saveJobForm('${j.id||''}')">Uložiť zákazku</button>
-        </div>
+        <div class="modalactions">${j.id ? `<button class="btn danger" onclick="removeJob('${j.id}')">Odstrániť</button>` : ''}<button class="btn" onclick="saveJobForm('${j.id||''}')">Uložiť</button></div>
       `);
-      
       updateTimeDropdowns(formatTimeOnly(j.startTime) || '08:00', formatTimeOnly(j.endTime) || '16:00');
-      setTimeout(updateJobChecks, 100);
     }
 
-    function updateTimeDropdowns(selectedStart = '08:00', selectedEnd = '16:00') {
-      const mechId = $('jMechanic')?.value;
-      const dateVal = $('jDate')?.value;
-
-      let bookedIntervals = [];
-      
-      const lunchStart = formatTimeOnly(data.settings?.lunchStart) || '12:00';
-      const lunchEnd = formatTimeOnly(data.settings?.lunchEnd) || '12:30';
-      bookedIntervals.push({ start: lunchStart, end: lunchEnd, task: '🍽 Obedňajšia pauza' });
-
-      if (mechId && dateVal) {
-        data.jobs.forEach(job => {
-          if (window.editingJobId && job.id === window.editingJobId) return;
-          if (String(job.mechanicId) === String(mechId) && normalizeDateKey(job.date) === dateVal) {
-            let jStart = formatTimeOnly(job.startTime) || '08:00';
-            let jEnd = formatTimeOnly(job.endTime) || '16:00';
-            bookedIntervals.push({ start: jStart, end: jEnd, task: job.task });
-          }
-        });
-      }
-
-      const busyInfoEl = $('busyTimesList');
-      if (busyInfoEl) {
-        busyInfoEl.innerHTML = bookedIntervals.map(b => `<br>• <b>${b.start} - ${b.end}</b> (${esc(b.task)})`).join('');
-      }
-
-      let startOpts = '';
-      let endOpts = '';
-
-      TIME_OPTIONS.forEach(t => {
-        let isBooked = bookedIntervals.some(b => t >= b.start && t < b.end);
-        let matchLunch = (t >= lunchStart && t < lunchEnd);
-        let labelSuffix = '';
-        
-        if (isBooked || matchLunch) {
-          isBooked = true;
-          if (matchLunch) {
-            labelSuffix = ` 🍽 [OBSADENÉ – Obedňajšia pauza (${lunchStart} - ${lunchEnd})]`;
-          } else {
-            labelSuffix = ' 🚫 [OBSADENÉ]';
-          }
-        }
-        
-        startOpts += `<option value="${t}" ${t === selectedStart ? 'selected' : ''} ${isBooked ? 'style="color:red;background:#fff0f0"' : ''}>${t}${labelSuffix}</option>`;
-        endOpts += `<option value="${t}" ${t === selectedEnd ? 'selected' : ''}>${t}</option>`;
-      });
-
-      if ($('jStart')) $('jStart').innerHTML = startOpts;
-      if ($('jEnd')) $('jEnd').innerHTML = endOpts;
+    function updateTimeDropdowns(sT = '08:00', eT = '16:00') {
+      let opts = TIME_OPTIONS.map(t => `<option value="${t}" ${t === sT ? 'selected' : ''}>${t}</option>`).join('');
+      let eOpts = TIME_OPTIONS.map(t => `<option value="${t}" ${t === eT ? 'selected' : ''}>${t}</option>`).join('');
+      if($('jStart')) $('jStart').innerHTML = opts;
+      if($('jEnd')) $('jEnd').innerHTML = eOpts;
     }
 
-    function updateJobChecks() {
-      const mechId = $('jMechanic')?.value;
-      const dateVal = $('jDate')?.value;
-      const warnBox = $('leaveWarning');
-      
-      if(warnBox && mechId && dateVal) {
-        const onLeave = data.leaves.some(l => {
-          if (String(l.mechanicId) !== String(mechId)) return false;
-          let lStart = normalizeDateKey(l.startDate);
-          let lEnd = normalizeDateKey(l.endDate);
-          return dateVal >= lStart && dateVal <= lEnd;
-        });
-        warnBox.style.display = onLeave ? 'block' : 'none';
-      } else if(warnBox) {
-        warnBox.style.display = 'none';
-      }
+    function updateJobChecks() {}
 
-      updateTimeDropdowns($('jStart')?.value || '08:00', $('jEnd')?.value || '16:00');
-    }
-
-    function editJob(id) { 
+    function editJob(id) {
       window.editingJobId = id;
-      openJob(data.jobs.find(j => String(j.id) === String(id))); 
+      openJob((data.jobs || []).find(j => String(j.id) === String(id)));
     }
-    
+
     async function saveJobForm(id) {
-      window.editingJobId = null;
-      const mechId = $('jMechanic').value;
-      const dateVal = $('jDate').value;
-      const startTime = $('jStart').value;
-      const endTime = $('jEnd').value;
-      
-      if (!mechId) {
-        alert('Vyberte mechanika!');
-        return;
-      }
-
-      if (startTime >= endTime) {
-        alert('Čas "Do" musí byť neskorší ako čas "Od"!');
-        return;
-      }
-
-      const onLeave = data.leaves.some(l => {
-        if (String(l.mechanicId) !== String(mechId)) return false;
-        let lStart = normalizeDateKey(l.startDate);
-        let lEnd = normalizeDateKey(l.endDate);
-        return dateVal >= lStart && dateVal <= lEnd;
-      });
-      if(onLeave) {
-        if(!confirm('Upozornenie: Mechanik má v tento deň nahlásenú PN/neprítomnosť! Naozaj chcete napriek tomu pridať zákazku?')) return;
-      }
-
-      const vehicleId = $('jVehicle').value;
-      const newPlate = $('jNewPlate')?.value.trim() || '';
-
-      if (!id && !vehicleId && !newPlate) {
-        alert('Musíte buď vybrať existujúce vozidlo zo zoznamu, alebo vyplniť novú ŠPZ!');
-        return;
-      }
-
-      const j = { 
-        id: id || undefined, 
-        date: dateVal, 
-        mechanicId: mechId, 
-        vehicleId: vehicleId, 
-        newPlate: newPlate,
-        newMake: $('jNewMake')?.value || '',
-        newCustomer: $('jNewCustomer')?.value || '',
-        status: $('jStatus').value, 
-        startTime: startTime, 
-        endTime: endTime, 
-        task: $('jTask').value 
-      };
-
-      try { 
-        await call('saveJob', token, j); 
-        closeModal(); 
-        await loadData(); 
+      try {
+        await call('saveJob', token, {
+          id: id || undefined,
+          date: $('jDate').value,
+          mechanicId: $('jMechanic').value,
+          vehicleId: $('jVehicle').value,
+          newPlate: $('jNewPlate')?.value || '',
+          newMake: $('jNewMake')?.value || '',
+          newCustomer: $('jNewCustomer')?.value || '',
+          status: $('jStatus').value,
+          startTime: $('jStart').value,
+          endTime: $('jEnd').value,
+          task: $('jTask').value
+        });
+        closeModal(); await loadData();
       } catch(e) { alert(e.message); }
     }
 
     async function removeJob(id) {
-      if(!confirm('Naozaj odstrániť túto zákazku?')) return;
-      try { 
-        await call('deleteJob', token, id); 
-        closeModal(); 
-        await loadData(); 
-      } catch(e) { alert(e.message); }
+      if(!confirm('Vymazať?')) return;
+      try { await call('deleteJob', token, id); closeModal(); await loadData(); } catch(e) { alert(e.message); }
     }
 
     async function statusChange(id, status) {
-      try {
-        await call('updateJobStatus', token, id, status);
-        await loadData();
-      } catch(e) { alert(e.message); }
+      try { await call('updateJobStatus', token, id, status); await loadData(); } catch(e) { alert(e.message); }
     }
 
     async function changePassword() {
       try {
         await call('setMyPassword', token, $('oldPass').value, $('newPass').value);
         $('oldPass').value = ''; $('newPass').value = '';
-        alert('Heslo bolo úspešne zmenené.');
+        alert('Heslo zmenené.');
       } catch(e) { alert(e.message); }
     }
 
     function openModal(title, html) {
-      window.editingJobId = null;
       $('modalTitle').textContent = title;
       $('modalBody').innerHTML = html;
       $('modalBack').classList.remove('hidden');
     }
-    function closeModal() { 
-      window.editingJobId = null;
-      $('modalBack').classList.add('hidden'); 
-    }
+    function closeModal() { $('modalBack').classList.add('hidden'); }
 
+    // Automatické prihlásenie ak existuje token
     if (token) { loadData(); }
   </script>
 </body>
