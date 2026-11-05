@@ -339,6 +339,19 @@
       }
     }
 
+    // Pomocná funkcia na čisté vytiahnutie času (napr. 12:00) z akéhokoľvek obskúrneho reťazca
+    function formatTimeOnly(tStr) {
+      if (!tStr) return '';
+      let s = String(tStr);
+      if (s.includes('T')) {
+        let timePart = s.split('T')[1];
+        if (timePart) {
+          return timePart.substring(0, 5);
+        }
+      }
+      return s.substring(0, 5);
+    }
+
     async function call(name, ...args) {
       try {
         const response = await fetch(API_URL, {
@@ -387,6 +400,7 @@
         if(!data.adminNotes) data.adminNotes = [];
         if(!data.leaves) data.leaves = [];
         if(!data.mechanics) data.mechanics = [];
+        if(!data.users) data.users = [];
         if(!data.settings) data.settings = { lunchStart:'12:00', lunchEnd:'12:30' };
         me = data.user;
 
@@ -396,8 +410,8 @@
         $('refreshBtn').classList.remove('hidden');
         $('who').textContent = me.name + ' · ' + (me.role === 'admin' ? 'Admin' : 'Mechanik');
 
-        if($('setLunchStart')) $('setLunchStart').value = data.settings.lunchStart || '12:00';
-        if($('setLunchEnd')) $('setLunchEnd').value = data.settings.lunchEnd || '12:30';
+        if($('setLunchStart')) $('setLunchStart').value = formatTimeOnly(data.settings.lunchStart) || '12:00';
+        if($('setLunchEnd')) $('setLunchEnd').value = formatTimeOnly(data.settings.lunchEnd) || '12:30';
 
         const isAdmin = me.role === 'admin';
         document.querySelectorAll('.admin-only').forEach(el => {
@@ -512,7 +526,7 @@
             <td><b>${esc(formatDate(j.date))}</b></td>
             <td><b>${esc(v.plate || 'Bez ŠPZ')}</b><br><small class="muted">${esc((v.make||'') + ' ' + (v.model||''))}</small></td>
             <td>${esc(m.name || 'Nepriradený')}</td>
-            <td>${esc(j.startTime || '08:00')} - ${esc(j.endTime || '16:00')}</td>
+            <td>${esc(formatTimeOnly(j.startTime) || '08:00')} - ${esc(formatTimeOnly(j.endTime) || '16:00')}</td>
             <td>${esc(j.task)}</td>
             <td>
               <select class="status-select" onchange="statusChange('${j.id}', this.value)">
@@ -702,7 +716,7 @@
 
     function openLeaveModal() {
       const today = dateKey(new Date());
-      const allUsersOpts = (data.users || []).map(u => `<option value="${u.id}">${esc(u.name)} (${u.role === 'admin' ? 'Admin' : 'Mechanik'})</option>`).join('');
+      const allUsersOpts = (data.users || data.mechanics || []).map(u => `<option value="${u.id}">${esc(u.name)} (${u.role === 'admin' ? 'Admin' : 'Mechanik'})</option>`).join('');
 
       openModal('Zadať PN / Neprítomnosť', `
         <div class="formgrid">
@@ -749,14 +763,16 @@
       const end = plusDays(weekStart, 6);
       $('weekLabel').textContent = fmt(weekStart) + ' – ' + fmt(end) + ' ' + end.getFullYear();
 
-      // Bezpečné získanie mechanikov (ak by data.mechanics bola prázdna, použijeme data.users, ktorí nie sú admini)
+      // Bezpečné získanie mechanikov (skontroluje mechanics, ak prázdne, siahne do users, resp. zoberie všetkých ne-adminov)
       let mechanics = (data.mechanics || []).filter(m => m.role !== 'admin');
       if (mechanics.length === 0 && data.users) {
         mechanics = data.users.filter(u => u.role !== 'admin');
       }
-      // Ak by stále neboli, zoberieme všetkých používateľov okrem adminov, resp. všetkých ak iní nie sú
       if (mechanics.length === 0 && data.users) {
         mechanics = data.users;
+      }
+      if (mechanics.length === 0 && data.mechanics) {
+        mechanics = data.mechanics;
       }
 
       const startKey = dateKey(weekStart);
@@ -775,8 +791,8 @@
         `<div class="calhead">${['Ne','Po','Ut','St','Št','Pi','So'][d.getDay()]}<br>${fmt(d)}</div>`
       ).join('');
 
-      const lunchStart = data.settings.lunchStart || '12:00';
-      const lunchEnd = data.settings.lunchEnd || '12:30';
+      const lunchStart = formatTimeOnly(data.settings.lunchStart) || '12:00';
+      const lunchEnd = formatTimeOnly(data.settings.lunchEnd) || '12:30';
 
       if (mechanics.length === 0) {
         html += `<div style="grid-column: 1 / -1; padding: 20px; text-align: center; color: var(--muted);">V systéme nie sú zatiaľ pridaní žiadni mechanici. Pridajte ich v záložke Mechanici.</div>`;
@@ -795,7 +811,7 @@
           });
 
           const list = jobs.filter(j => String(j.mechanicId) === String(m.id) && normalizeDateKey(j.date) === ds);
-          list.sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
+          list.sort((a,b) => (formatTimeOnly(a.startTime)||'').localeCompare(formatTimeOnly(b.startTime)||''));
 
           let cellContent = '';
           
@@ -832,7 +848,7 @@
       return `
         <div class="job status-${esc(j.status)}">
           <strong>${esc(v.plate || 'Bez ŠPZ')} · ${esc((v.make || '') + ' ' + (v.model || ''))}</strong>
-          <div class="time">⏱ ${esc(j.startTime || '08:00')} - ${esc(j.endTime || '16:00')}</div>
+          <div class="time">⏱ ${esc(formatTimeOnly(j.startTime) || '08:00')} - ${esc(formatTimeOnly(j.endTime) || '16:00')}</div>
           <div class="task-desc"><b>Popis:</b> ${esc(j.task)}</div>
           
           <div style="margin-top:6px">
@@ -1004,11 +1020,12 @@
 
     function renderMechanics() {
       if (me.role !== 'admin') return;
-      let rows = data.mechanics.map(m => `
+      let mechList = data.mechanics.length > 0 ? data.mechanics : data.users;
+      let rows = mechList.map(m => `
         <tr>
           <td><b>${esc(m.name)}</b></td>
           <td>${esc(m.username)}</td>
-          <td><span class="badge">Mechanik</span></td>
+          <td><span class="badge">${esc(m.role || 'mechanic')}</span></td>
           <td><button class="btn secondary small" onclick="editMechanic('${m.id}')">Upraviť</button></td>
         </tr>
       `).join('');
@@ -1023,7 +1040,10 @@
         <div class="modalactions"><button class="btn" onclick="saveMechanicForm('${m.id||''}')">Uložiť</button></div>
       `);
     }
-    function editMechanic(id) { openMechanic(data.mechanics.find(m => m.id === id)); }
+    function editMechanic(id) { 
+      let m = data.mechanics.find(item => String(item.id) === String(id)) || data.users.find(item => String(item.id) === String(id));
+      openMechanic(m || {}); 
+    }
     async function saveMechanicForm(id) {
       try { await call('saveMechanic', token, { id: id||undefined, name:$('mName').value, username:$('mUser').value, password:$('mPass').value }); closeModal(); await loadData(); } catch(e) { alert(e.message); }
     }
@@ -1032,7 +1052,10 @@
       if (me.role !== 'admin') return;
       const today = dateKey(new Date());
       const vehicleOpts = data.vehicles.map(v => `<option value="${v.id}" ${j.vehicleId===v.id?'selected':''}>${esc(v.plate)} – ${esc(v.make)} ${esc(v.model)} (${esc(v.customer)})</option>`).join('');
-      const mechOpts = data.mechanics.map(m => `<option value="${m.id}" ${j.mechanicId===m.id?'selected':''}>${esc(m.name)}</option>`).join('');
+      
+      // Bezpečné naplnenie zoznamu mechanikov (zohľadní mechanikov aj všetkých používateľov)
+      let allMechs = data.mechanics.length > 0 ? data.mechanics : data.users;
+      const mechOpts = allMechs.map(m => `<option value="${m.id}" ${String(j.mechanicId)===String(m.id)?'selected':''}>${esc(m.name)}</option>`).join('');
 
       openModal(j.id ? 'Upraviť zákazku' : 'Naplánovať vozidlo', `
         <div class="formgrid">
@@ -1074,7 +1097,7 @@
         </div>
       `);
       
-      updateTimeDropdowns(j.startTime || '08:00', j.endTime || '16:00');
+      updateTimeDropdowns(formatTimeOnly(j.startTime) || '08:00', formatTimeOnly(j.endTime) || '16:00');
       setTimeout(updateJobChecks, 100);
     }
 
@@ -1084,16 +1107,16 @@
 
       let bookedIntervals = [];
       
-      const lunchStart = String(data.settings?.lunchStart || '12:00').substring(0, 5);
-      const lunchEnd = String(data.settings?.lunchEnd || '12:30').substring(0, 5);
+      const lunchStart = formatTimeOnly(data.settings?.lunchStart) || '12:00';
+      const lunchEnd = formatTimeOnly(data.settings?.lunchEnd) || '12:30';
       bookedIntervals.push({ start: lunchStart, end: lunchEnd, task: '🍽 Obedňajšia pauza' });
 
       if (mechId && dateVal) {
         data.jobs.forEach(job => {
           if (window.editingJobId && job.id === window.editingJobId) return;
           if (String(job.mechanicId) === String(mechId) && normalizeDateKey(job.date) === dateVal) {
-            let jStart = String(job.startTime || '08:00').substring(0, 5);
-            let jEnd = String(job.endTime || '16:00').substring(0, 5);
+            let jStart = formatTimeOnly(job.startTime) || '08:00';
+            let jEnd = formatTimeOnly(job.endTime) || '16:00';
             bookedIntervals.push({ start: jStart, end: jEnd, task: job.task });
           }
         });
@@ -1151,7 +1174,7 @@
 
     function editJob(id) { 
       window.editingJobId = id;
-      openJob(data.jobs.find(j => j.id === id)); 
+      openJob(data.jobs.find(j => String(j.id) === String(id))); 
     }
     
     async function saveJobForm(id) {
@@ -1161,6 +1184,11 @@
       const startTime = $('jStart').value;
       const endTime = $('jEnd').value;
       
+      if (!mechId) {
+        alert('Vyberte mechanika!');
+        return;
+      }
+
       if (startTime >= endTime) {
         alert('Čas "Do" musí byť neskorší ako čas "Od"!');
         return;
