@@ -139,7 +139,7 @@
       <button class="tab admin-only" data-tab="notes" onclick="showTab('notes')">Moje poznámky</button>
       <button class="tab" data-tab="tires" onclick="showTab('tires')">Sklad pneu</button>
       <button class="tab admin-only" data-tab="vehicles" onclick="showTab('vehicles')">Vozidlá</button>
-      <button class="tab admin-only" data-tab="mechanics" onclick="showTab('mechanics')">Mechanici</button>
+      <button class="tab admin-only" data-tab="mechanics" onclick="showTab('mechanics')">Používatelia</button>
       <button class="tab admin-only" data-tab="settings" onclick="showTab('settings')">⚙️ Nastavenia</button>
       <button class="tab" data-tab="password" onclick="showTab('password')">Zmena hesla</button>
     </div>
@@ -185,7 +185,6 @@
         <button class="btn" onclick="openLeaveModal()">+ Pridať PN / Neprítomnosť</button>
       </div>
 
-      <!-- Kalendár PN ako podkategória v Zozname PN -->
       <div style="background:#f8faff;border:1px solid #cbd8ff;border-radius:12px;padding:18px;margin-bottom:24px">
         <h3 style="margin-top:0;color:#204bb7;font-size:16px;margin-bottom:12px">📅 Kalendár PN (Prehľad všetkých osôb)</h3>
         <div id="leavesCalendarMatrix"></div>
@@ -228,8 +227,8 @@
     <!-- TAB: MECHANICI -->
     <div id="mechanicsTab" class="panel section hidden">
       <div class="headrow">
-        <h2>Mechanici dielne</h2>
-        <button class="btn" onclick="openMechanic()">+ Pridať mechanika</button>
+        <h2>Používatelia dielne</h2>
+        <button class="btn" onclick="openMechanic()">+ Pridať používateľa</button>
       </div>
       <div class="tablewrap" id="mechanicTable"></div>
     </div>
@@ -464,7 +463,7 @@
         notes: 'Moje poznámky',
         tires: 'Sklad pneumatík',
         vehicles: 'Správa vozidiel',
-        mechanics: 'Zoznam mechanikov',
+        mechanics: 'Zoznam používateľov',
         settings: 'Nastavenia dielne',
         password: 'Zmena hesla'
       })[tab] || '';
@@ -963,23 +962,51 @@
           <td><b>${esc(m.name)}</b></td>
           <td>${esc(m.username)}</td>
           <td><span class="badge">${esc(m.role === 'admin' ? 'Admin' : 'Mechanik')}</span></td>
-          <td><button class="btn secondary small" onclick="editMechanic('${m.id}')">Upraviť</button></td>
+          <td>
+            <button class="btn secondary small" onclick="editMechanic('${m.id}')">Upraviť</button>
+            <button class="btn danger small" onclick="removeMechanic('${m.id}')">Vymazať</button>
+          </td>
         </tr>
       `).join('');
-      $('mechanicTable').innerHTML = `<table><thead><tr><th>Meno</th><th>Prihlasovacie meno</th><th>Rola</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="4">Zatiaľ nie sú pridaní mechanici.</td></tr>'}</tbody></table>`;
+      $('mechanicTable').innerHTML = `<table><thead><tr><th>Meno</th><th>Prihlasovacie meno</th><th>Rola</th><th>Akcie</th></tr></thead><tbody>${rows || '<tr><td colspan="4">Zatiaľ nie sú pridaní používatelia.</td></tr>'}</tbody></table>`;
     }
 
     function openMechanic(m={}) {
-      openModal(m.id ? 'Upraviť mechanika' : 'Pridať mechanika', `
-        <label>Meno mechanika *</label><input id="mName" value="${esc(m.name||'')}">
+      const roleVal = m.role || 'mechanic';
+      openModal(m.id ? 'Upraviť používateľa' : 'Pridať používateľa', `
+        <label>Meno používateľa *</label><input id="mName" value="${esc(m.name||'')}">
         <label>Prihlasovacie meno *</label><input id="mUser" value="${esc(m.username||'')}">
+        <label>Rola *</label>
+        <select id="mRole">
+          <option value="mechanic" ${roleVal === 'mechanic' ? 'selected' : ''}>Mechanik</option>
+          <option value="admin" ${roleVal === 'admin' ? 'selected' : ''}>Admin</option>
+        </select>
         <label>${m.id ? 'Nové heslo (nechaj prázdne, ak sa nemení)' : 'Heslo (min. 8 znakov) *'}</label><input id="mPass" type="password">
         <div class="modalactions"><button class="btn" onclick="saveMechanicForm('${m.id||''}')">Uložiť</button></div>
       `);
     }
     function editMechanic(id) { openMechanic(data.mechanics.find(m => m.id === id)); }
+    
     async function saveMechanicForm(id) {
-      try { await call('saveMechanic', token, { id: id||undefined, name:$('mName').value, username:$('mUser').value, password:$('mPass').value }); closeModal(); await loadData(); } catch(e) { alert(e.message); }
+      try { 
+        await call('saveMechanic', token, { 
+          id: id || undefined, 
+          name: $('mName').value, 
+          username: $('mUser').value, 
+          role: $('mRole').value,
+          password: $('mPass').value 
+        }); 
+        closeModal(); 
+        await loadData(); 
+      } catch(e) { alert(e.message); }
+    }
+
+    async function removeMechanic(id) {
+      if(!confirm('Naozaj chcete vymazať tohto používateľa?')) return;
+      try {
+        await call('deleteMechanic', token, id);
+        await loadData();
+      } catch(e) { alert(e.message); }
     }
 
     function openJob(j={}) {
