@@ -763,7 +763,7 @@
           } else {
             cellContent += `
               <div class="lunch-box">
-                🍽 Obed (${lunchStart} - ${lunchEnd})
+                🍽 Obed (od ${lunchStart} do ${lunchEnd})
               </div>
             `;
           }
@@ -1053,7 +1053,7 @@
 
       const busyInfoEl = $('busyTimesList');
       if (busyInfoEl) {
-        busyInfoEl.innerHTML = bookedIntervals.map(b => `<br>• <b>${b.start} - ${b.end}</b> (${esc(b.task)})`).join('');
+        busyInfoEl.innerHTML = bookedIntervals.map(b => `<br>• <b>od ${b.start} do ${b.end}</b> (${esc(b.task)})`).join('');
       }
 
       let startOpts = '';
