@@ -366,7 +366,7 @@
         $('loginError').textContent = e.message;
         token = '';
         sessionStorage.removeItem('as_token');
-        $('loginView').classList.add('hidden');
+        $('loginView').classList.remove('hidden');
         $('appView').classList.add('hidden');
       }
     }
@@ -704,7 +704,6 @@
               </div>
             `;
           } else {
-            // Zobrazíme obedňajšiu pauzu pre každý pracovný deň, ak je nastavená
             cellContent += `
               <div class="lunch-box">
                 🍽 Obed (${lunchStart} - ${lunchEnd})
@@ -982,16 +981,17 @@
 
       let bookedIntervals = [];
       
-      // Automaticky pridáme obed do obsadených časov
-      const lunchStart = data.settings.lunchStart || '12:00';
-      const lunchEnd = data.settings.lunchEnd || '12:30';
-      bookedIntervals.push({ start: lunchStart, end: lunchEnd, task: 'Obedňajšia pauza' });
+      const lunchStart = String(data.settings?.lunchStart || '12:00').substring(0, 5);
+      const lunchEnd = String(data.settings?.lunchEnd || '12:30').substring(0, 5);
+      bookedIntervals.push({ start: lunchStart, end: lunchEnd, task: '🍽 Obedňajšia pauza' });
 
       if (mechId && dateVal) {
         data.jobs.forEach(job => {
           if (window.editingJobId && job.id === window.editingJobId) return;
           if (String(job.mechanicId) === String(mechId) && String(job.date) === String(dateVal)) {
-            bookedIntervals.push({ start: job.startTime || '08:00', end: job.endTime || '16:00', task: job.task });
+            let jStart = String(job.startTime || '08:00').substring(0, 5);
+            let jEnd = String(job.endTime || '16:00').substring(0, 5);
+            bookedIntervals.push({ start: jStart, end: jEnd, task: job.task });
           }
         });
       }
@@ -1006,7 +1006,17 @@
 
       TIME_OPTIONS.forEach(t => {
         let isBooked = bookedIntervals.some(b => t >= b.start && t < b.end);
-        let labelSuffix = isBooked ? ' ❌ [OBSADENÉ]' : '';
+        let matchLunch = (t >= lunchStart && t < lunchEnd);
+        let labelSuffix = '';
+        
+        if (isBooked || matchLunch) {
+          isBooked = true;
+          if (matchLunch) {
+            labelSuffix = ` 🍽 [OBSADENÉ – Obedňajšia pauza (${lunchStart} - ${lunchEnd})]`;
+          } else {
+            labelSuffix = ' 🚫 [OBSADENÉ]';
+          }
+        }
         
         startOpts += `<option value="${t}" ${t === selectedStart ? 'selected' : ''} ${isBooked ? 'style="color:red;background:#fff0f0"' : ''}>${t}${labelSuffix}</option>`;
         endOpts += `<option value="${t}" ${t === selectedEnd ? 'selected' : ''}>${t}</option>`;
@@ -1050,7 +1060,7 @@
 
       const onLeave = data.leaves.some(l => String(l.mechanicId) === String(mechId) && dateVal >= l.startDate && dateVal <= l.endDate);
       if(onLeave) {
-        if(!confirm('Upozornenie: Mechanik má v tento deň nahlásenú PN/neprítomność! Naozaj chcete napriek tomu pridať zákazku?')) return;
+        if(!confirm('Upozornenie: Mechanik má v tento deň nahlásenú PN/neprítomnosť! Naozaj chcete napriek tomu pridať zákazku?')) return;
       }
 
       const vehicleId = $('jVehicle').value;
