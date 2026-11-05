@@ -304,6 +304,18 @@
     const $ = id => document.getElementById(id);
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+    function formatTimeOnly(tStr) {
+      if (!tStr) return '';
+      let s = String(tStr);
+      if (s.includes('T')) {
+        let timePart = s.split('T')[1];
+        if (timePart) {
+          return timePart.substring(0, 5);
+        }
+      }
+      return s.substring(0, 5);
+    }
+
     async function call(name, ...args) {
       try {
         const response = await fetch(API_URL, {
@@ -360,8 +372,8 @@
         $('refreshBtn').classList.remove('hidden');
         $('who').textContent = me.name + ' · ' + (me.role === 'admin' ? 'Admin' : 'Mechanik');
 
-        if($('setLunchStart')) $('setLunchStart').value = data.settings.lunchStart || '12:00';
-        if($('setLunchEnd')) $('setLunchEnd').value = data.settings.lunchEnd || '12:30';
+        if($('setLunchStart')) $('setLunchStart').value = formatTimeOnly(data.settings.lunchStart) || '12:00';
+        if($('setLunchEnd')) $('setLunchEnd').value = formatTimeOnly(data.settings.lunchEnd) || '12:30';
 
         const isAdmin = me.role === 'admin';
         document.querySelectorAll('.admin-only').forEach(el => {
@@ -514,7 +526,6 @@
       if (me.role !== 'admin') return;
       const list = data.leaves.sort((a,b) => (b.startDate||'').localeCompare(a.startDate||''));
 
-      // 1. Vykreslenie maticového kalendára PN
       let calendarBoxHtml = '';
       if (list.length === 0) {
         calendarBoxHtml = '<div style="color:var(--muted);font-style:italic;padding:6px;">Žiadne aktívne PN ani neprítomnosti.</div>';
@@ -551,7 +562,6 @@
       }
       $('leavesCalendarMatrix').innerHTML = calendarBoxHtml;
 
-      // 2. Vykreslenie štandardného tabuľkového zoznamu PN
       let rows = list.map(l => {
         const m = mechanic(l.mechanicId);
         const roleBadge = m.role === 'admin' ? 'Admin' : 'Mechanik';
@@ -668,7 +678,6 @@
 
     function openLeaveModal() {
       const today = dateKey(new Date());
-      // Všetci používatelia (vrátane adminov) v ponuke pre PN
       const userOpts = data.mechanics.map(m => `<option value="${m.id}">${esc(m.name)} (${m.role === 'admin' ? 'Admin' : 'Mechanik'})</option>`).join('');
 
       openModal('Zadať PN / Neprítomnosť', `
@@ -730,8 +739,8 @@
         `<div class="calhead">${['Ne','Po','Ut','St','Št','Pi','So'][d.getDay()]}<br>${fmt(d)}</div>`
       ).join('');
 
-      const lunchStart = data.settings.lunchStart || '12:00';
-      const lunchEnd = data.settings.lunchEnd || '12:30';
+      const lunchStart = formatTimeOnly(data.settings.lunchStart) || '12:00';
+      const lunchEnd = formatTimeOnly(data.settings.lunchEnd) || '12:30';
 
       mechanics.forEach(m => {
         html += `<div class="calname"><span class="dot"></span>${esc(m.name)}</div>`;
@@ -1029,8 +1038,8 @@
 
       let bookedIntervals = [];
       
-      const lunchStart = data.settings.lunchStart || '12:00';
-      const lunchEnd = data.settings.lunchEnd || '12:30';
+      const lunchStart = formatTimeOnly(data.settings.lunchStart) || '12:00';
+      const lunchEnd = formatTimeOnly(data.settings.lunchEnd) || '12:30';
       bookedIntervals.push({ start: lunchStart, end: lunchEnd, task: 'Obedňajšia pauza' });
 
       if (mechId && dateVal) {
