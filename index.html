@@ -178,7 +178,7 @@
       <div class="tablewrap" id="jobsListTable"></div>
     </div>
 
-    <!-- TAB: KALENDÁR PN (Vizuálny kalendár + zoznam PN pre všetkých vrátane adminov) -->
+    <!-- TAB: KALENDÁR PN -->
     <div id="leavesListTab" class="panel section hidden admin-only">
       <div class="headrow">
         <h2>Kalendár PN a neprítomností (Všetci zamestnanci a admini)</h2>
@@ -514,7 +514,6 @@
       if (me.role !== 'admin') return;
       const list = data.leaves.sort((a,b) => (b.startDate||'').localeCompare(a.startDate||''));
 
-      // 1. Vykreslíme tabuľkový zoznam PN
       let rows = list.map(l => {
         const p = data.users.find(u => String(u.id) === String(l.mechanicId)) || mechanic(l.mechanicId);
         return `
@@ -547,7 +546,6 @@
         </table>
       `;
 
-      // 2. Vykreslíme vizuálny Kalendár PN (prehľad aktuálneho mesiaca alebo najbližších dní)
       renderLeavesCalendarMatrix(list);
     }
 
@@ -560,7 +558,6 @@
         return;
       }
 
-      // Zoskupíme PN podľa osôb
       let byPerson = {};
       leaves.forEach(l => {
         const p = data.users.find(u => String(u.id) === String(l.mechanicId)) || mechanic(l.mechanicId);
@@ -1176,7 +1173,7 @@
       $('modalBack').classList.add('hidden'); 
     }
 
-    if (token) { loadDate(); }
+    if (token) { loadData(); }
   </script>
 </body>
 </html>
