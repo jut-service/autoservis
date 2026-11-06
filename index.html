@@ -56,6 +56,7 @@
     .job .task-desc{color:#334155;background:rgba(255,255,255,0.6);padding:4px 6px;border-radius:4px;margin:4px 0;font-size:11px;line-height:1.3}
     .job.status-Rozpracované{background:#fff4df;border-color:#d88b22}
     .job.status-Dokončené{background:#e6f6ee;border-color:#21966b}
+    .job.status-Zrušené{background:#fff0f0;border-color:var(--red);opacity:0.75}
     
     .leave-box{border-radius:8px;padding:10px;margin:0 0 8px;background:#fff0f0;border-left:4px solid var(--red);font-size:12px;color:var(--red);font-weight:700}
     .lunch-box{border-radius:8px;padding:8px;margin:0 0 8px;background:#fffbe6;border-left:4px solid #f1c40f;font-size:12px;color:#856404;font-weight:700;text-align:center}
@@ -155,7 +156,7 @@
     <!-- TAB: KALENDÁR DIELNE -->
     <div id="calendarTab">
       <div class="stats">
-        <div class="panel stat"><div class="num" id="statJobs">0</div><div class="caption">Zákazky v tomto týždni</div></div>
+        <div class="panel stat"><div class="num" id="statJobs">0</div><div class="caption">Aktívne zákazky v tomto týždni</div></div>
         <div class="panel stat"><div class="num" id="statMechanics">0</div><div class="caption">Aktívni mechanici</div></div>
         <div class="panel stat"><div class="num" id="statDone">0</div><div class="caption">Dokončené zákazky</div></div>
       </div>
@@ -318,7 +319,7 @@
     let weekStart = monday(new Date());
     let activeTab = 'calendar';
 
-    const STATUSES = ['Čaká na spracovanie', 'Rozpracované', 'Dokončené'];
+    const STATUSES = ['Čaká na spracovanie', 'Rozpracované', 'Dokončené', 'Zrušené'];
     
     const TIME_OPTIONS = [
       '07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', 
@@ -498,7 +499,6 @@
       })[tab] || '';
     }
 
-    // --- CHAT LOGIKA ---
     function renderChat() {
       const list = data.chatMessages || [];
       let html = '';
@@ -808,7 +808,9 @@
       const endKey = dateKey(end);
       const jobs = data.jobs.filter(j => j.date >= startKey && j.date <= endKey);
 
-      $('statJobs').textContent = jobs.length;
+      // Počítame len aktívne zákazky (nie Dokončené ani Zrušené) do štatistiky týždňa
+      const activeJobsCount = jobs.filter(j => j.status !== 'Dokončené' && j.status !== 'Zrušené').length;
+      $('statJobs').textContent = activeJobsCount;
       $('statMechanics').textContent = mechanics.length;
       $('statDone').textContent = jobs.filter(j => j.status === 'Dokončené').length;
 
@@ -1150,7 +1152,8 @@
       if (mechId && dateVal) {
         data.jobs.forEach(job => {
           if (window.editingJobId && job.id === window.editingJobId) return;
-          if (String(job.mechanicId) === String(mechId) && String(job.date) === String(dateVal)) {
+          // Zrušené zákazky blokujú čas v kalendári? Necháme ich blokovať alebo odfiltrujeme? Ak sú zrušené, časy už blokovať nemuseli, ale ak chcete blokovať len aktívne, môžete pridať kontrolu. Necháme štandardne blokovať.
+          if (String(job.mechanicId) === String(mechId) && String(job.date) === String(dateVal) && job.status !== 'Zrušené') {
             bookedIntervals.push({ start: job.startTime || '08:00', end: job.endTime || '16:00', task: job.task });
           }
         });
