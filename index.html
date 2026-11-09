@@ -24,6 +24,7 @@
     
     label{display:block;font-weight:650;margin:13px 0 6px;font-size:13px}
     input,select,textarea{width:100%;border:1px solid #d9deea;border-radius:9px;padding:10px 11px;background:#fff;color:var(--ink);outline:none}
+    input[type="checkbox"]{width:18px;height:18px;cursor:pointer}
     input:focus,select:focus,textarea:focus{border-color:#7192ed;box-shadow:0 0 0 3px #2457d614}
     textarea{resize:vertical;min-height:75px}
     
@@ -199,6 +200,7 @@
         <h2>Kompletný zoznam všetkých zákaziek</h2>
         <div class="toolbar">
           <input type="text" id="jobSearch" placeholder="Hľadať zákazku (ŠPZ, popis...)..." oninput="renderJobsList()" style="width:260px">
+          <button id="batchDeleteJobsBtn" class="btn danger small hidden" onclick="batchDeleteJobs()">🗑️ Vymazať označené zákazky</button>
           <button class="btn" onclick="openJob()">+ Naplánovať zákazku</button>
         </div>
       </div>
@@ -209,7 +211,10 @@
     <div id="leavesListTab" class="panel section hidden admin-only">
       <div class="headrow">
         <h2>Prehľad nahlásených PN a neprítomností</h2>
-        <button class="btn" onclick="openLeaveModal()">+ Pridať PN / Neprítomnosť</button>
+        <div class="toolbar">
+          <button id="batchDeleteLeavesBtn" class="btn danger small hidden" onclick="batchDeleteLeaves()">🗑️ Vymazať označené PN</button>
+          <button class="btn" onclick="openLeaveModal()">+ Pridať PN / Neprítomnosť</button>
+        </div>
       </div>
 
       <div style="background:#f8faff;border:1px solid #cbd8ff;border-radius:12px;padding:18px;margin-bottom:24px">
@@ -225,7 +230,10 @@
     <div id="notesTab" class="panel section hidden admin-only">
       <div class="headrow">
         <h2>Moje poznámky a pripomenutia</h2>
-        <button class="btn" onclick="openAdminNoteModal()">+ Pridať poznámku</button>
+        <div class="toolbar">
+          <button id="batchDeleteNotesBtn" class="btn danger small hidden" onclick="batchDeleteNotes()">🗑️ Vymazať označené poznámky</button>
+          <button class="btn" onclick="openAdminNoteModal()">+ Pridať poznámku</button>
+        </div>
       </div>
       <div class="tablewrap" id="notesTable"></div>
     </div>
@@ -246,7 +254,10 @@
     <div id="vehiclesTab" class="panel section hidden">
       <div class="headrow">
         <h2>Zoznam vozidiel</h2>
-        <button class="btn" onclick="openVehicle()">+ Pridať vozidlo</button>
+        <div class="toolbar">
+          <button id="batchDeleteVehiclesBtn" class="btn danger small hidden" onclick="batchDeleteVehicles()">🗑️ Vymazať označené vozidlá</button>
+          <button class="btn" onclick="openVehicle()">+ Pridať vozidlo</button>
+        </div>
       </div>
       <div class="tablewrap" id="vehicleTable"></div>
     </div>
@@ -547,6 +558,7 @@
       }
     }
 
+    // --- ZOZNAM ZÁKAZIEK S HROMADNÝM VYMAZÁVANÍm ---
     function renderJobsList() {
       if (me.role !== 'admin') return;
       const q = ($('jobSearch')?.value || '').toLowerCase();
@@ -562,6 +574,7 @@
         const m = mechanic(j.mechanicId);
         return `
           <tr>
+            <td><input type="checkbox" class="job-chk" value="${j.id}" onchange="toggleBatchBtn('job')"></td>
             <td><b>${esc(j.date)}</b></td>
             <td><b>${esc(v.plate || 'Bez ŠPZ')}</b><br><small class="muted">${esc((v.make||'') + ' ' + (v.model||''))}</small></td>
             <td>${esc(m.name || 'Nepriradený')}</td>
@@ -583,6 +596,7 @@
         <table>
           <thead>
             <tr>
+              <th style="width:30px"><input type="checkbox" id="allJobChk" onchange="toggleAllChk('job', this.checked)"></th>
               <th>Dátum</th>
               <th>Vozidlo / ŠPZ</th>
               <th>Mechanik</th>
@@ -593,12 +607,34 @@
             </tr>
           </thead>
           <tbody>
-            ${rows || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Žiadne zákazky v zozname.</td></tr>'}
+            ${rows || '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--muted)">Žiadne zákazky v zozname.</td></tr>'}
           </tbody>
         </table>
       `;
+      toggleBatchBtn('job');
     }
 
+    function toggleAllChk(type, checked) {
+      document.querySelectorAll('.' + type + '-chk').forEach(el => el.checked = checked);
+      toggleBatchBtn(type);
+    }
+
+    function toggleBatchBtn(type) {
+      const checkedCount = document.querySelectorAll('.' + type + '-chk:checked').length;
+      const btn = $('batchDelete' + type.charAt(0).toUpperCase() + type.slice(1) + 'sBtn');
+      if (btn) btn.classList.toggle('hidden', checkedCount === 0);
+    }
+
+    async function batchDeleteJobs() {
+      const ids = Array.from(document.querySelectorAll('.job-chk:checked')).map(el => el.value);
+      if (ids.length === 0 || !confirm(`Naozaj chcete vymazať ${ids.length} označených zákaziek?`)) return;
+      try {
+        await call('batchDeleteJobs', token, ids);
+        await loadData();
+      } catch(e) { alert(e.message); }
+    }
+
+    // --- ZOZNAM PN S HROMADNÝM VYMAZÁVANÍM ---
     function renderLeavesList() {
       if (me.role !== 'admin') return;
       const list = data.leaves.sort((a,b) => (b.startDate||'').localeCompare(a.startDate||''));
@@ -644,6 +680,7 @@
         const roleBadge = m.role === 'admin' ? 'Admin' : 'Mechanik';
         return `
           <tr>
+            <td><input type="checkbox" class="leave-chk" value="${l.id}" onchange="toggleBatchBtn('leave')"></td>
             <td><b>${esc(m.name || 'Neznáma osoba')}</b> <small class="muted">(${roleBadge})</small></td>
             <td>${esc(l.reason || 'PN / Neprítomný')}</td>
             <td>${esc(l.startDate)}</td>
@@ -659,6 +696,7 @@
         <table>
           <thead>
             <tr>
+              <th style="width:30px"><input type="checkbox" id="allLeaveChk" onchange="toggleAllChk('leave', this.checked)"></th>
               <th>Osoba (Mechanik / Admin)</th>
               <th>Dôvod / Typ</th>
               <th>Od dátumu</th>
@@ -667,16 +705,28 @@
             </tr>
           </thead>
           <tbody>
-            ${rows || '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--muted)">Žiadne aktívne PN ani neprítomnosti.</td></tr>'}
+            ${rows || '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted)">Žiadne aktívne PN ani neprítomnosti.</td></tr>'}
           </tbody>
         </table>
       `;
+      toggleBatchBtn('leave');
     }
 
+    async function batchDeleteLeaves() {
+      const ids = Array.from(document.querySelectorAll('.leave-chk:checked')).map(el => el.value);
+      if (ids.length === 0 || !confirm(`Naozaj chcete vymazať ${ids.length} označených záznamov o PN?`)) return;
+      try {
+        await call('batchDeleteLeaves', token, ids);
+        await loadData();
+      } catch(e) { alert(e.message); }
+    }
+
+    // --- MOJE POZNÁMKY S HROMADNÝM VYMAZÁVANÍM ---
     function renderAdminNotes() {
       if (me.role !== 'admin') return;
       let rows = data.adminNotes.sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(n => `
         <tr>
+          <td><input type="checkbox" class="note-chk" value="${n.id}" onchange="toggleBatchBtn('note')"></td>
           <td><b>${esc(n.date)}</b></td>
           <td><span style="${n.done ? 'text-decoration:line-through;color:var(--muted)' : ''}">${esc(n.text)}</span></td>
           <td><span class="badge ${n.done ? 'done' : 'todo'}">${n.done ? 'Vybavené' : 'Aktívne'}</span></td>
@@ -690,6 +740,7 @@
         <table>
           <thead>
             <tr>
+              <th style="width:30px"><input type="checkbox" id="allNoteChk" onchange="toggleAllChk('note', this.checked)"></th>
               <th>Dátum</th>
               <th>Pripomenutie / Poznámka</th>
               <th>Stav</th>
@@ -697,10 +748,20 @@
             </tr>
           </thead>
           <tbody>
-            ${rows || '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted)">Žiadne poznámky. Pridajte si prvú.</td></tr>'}
+            ${rows || '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--muted)">Žiadne poznámky. Pridajte si prvú.</td></tr>'}
           </tbody>
         </table>
       `;
+      toggleBatchBtn('note');
+    }
+
+    async function batchDeleteNotes() {
+      const ids = Array.from(document.querySelectorAll('.note-chk:checked')).map(el => el.value);
+      if (ids.length === 0 || !confirm(`Naozaj chcete vymazať ${ids.length} označených poznámok?`)) return;
+      try {
+        await call('batchDeleteNotes', token, ids);
+        await loadData();
+      } catch(e) { alert(e.message); }
     }
 
     function openAdminNoteModal(id = '') {
@@ -808,7 +869,6 @@
       const endKey = dateKey(end);
       const jobs = data.jobs.filter(j => j.date >= startKey && j.date <= endKey);
 
-      // Počítame len aktívne zákazky (nie Dokončené ani Zrušené) do štatistiky týždňa
       const activeJobsCount = jobs.filter(j => j.status !== 'Dokončené' && j.status !== 'Zrušené').length;
       $('statJobs').textContent = activeJobsCount;
       $('statMechanics').textContent = mechanics.length;
@@ -994,10 +1054,12 @@
       } catch(e) { alert(e.message); }
     }
 
+    // --- VOZIDLÁ S HROMADNÝM VYMAZÁVANÍM ---
     function renderVehicles() {
       if (me.role !== 'admin') return;
       let rows = data.vehicles.map(v => `
         <tr>
+          <td><input type="checkbox" class="vehicle-chk" value="${v.id}" onchange="toggleBatchBtn('vehicle')"></td>
           <td><b>${esc(v.plate)}</b></td>
           <td>${esc(v.make)} ${esc(v.model)}</td>
           <td>${esc(v.customer)}</td>
@@ -1006,7 +1068,34 @@
           <td><button class="btn secondary small" onclick="editVehicle('${v.id}')">Upraviť</button></td>
         </tr>
       `).join('');
-      $('vehicleTable').innerHTML = `<table><thead><tr><th>ŠPZ</th><th>Vozidlo</th><th>Zákazník</th><th>Telefón</th><th>Poznámka</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="6">Zatiaľ nie sú pridané vozidlá.</td></tr>'}</tbody></table>`;
+      $('vehicleTable').innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th style="width:30px"><input type="checkbox" id="allVehicleChk" onchange="toggleAllChk('vehicle', this.checked)"></th>
+              <th>ŠPZ</th>
+              <th>Vozidlo</th>
+              <th>Zákazník</th>
+              <th>Telefón</th>
+              <th>Poznámka</th>
+              <th>Akcie</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Zatiaľ nie sú pridané vozidlá.</td></tr>'}
+          </tbody>
+        </table>
+      `;
+      toggleBatchBtn('vehicle');
+    }
+
+    async function batchDeleteVehicles() {
+      const ids = Array.from(document.querySelectorAll('.vehicle-chk:checked')).map(el => el.value);
+      if (ids.length === 0 || !confirm(`Naozaj chcete vymazať ${ids.length} označených vozidiel?`)) return;
+      try {
+        await call('batchDeleteVehicles', token, ids);
+        await loadData();
+      } catch(e) { alert(e.message); }
     }
 
     function openVehicle(v={}) {
@@ -1152,7 +1241,6 @@
       if (mechId && dateVal) {
         data.jobs.forEach(job => {
           if (window.editingJobId && job.id === window.editingJobId) return;
-          // Zrušené zákazky blokujú čas v kalendári? Necháme ich blokovať alebo odfiltrujeme? Ak sú zrušené, časy už blokovať nemuseli, ale ak chcete blokovať len aktívne, môžete pridať kontrolu. Necháme štandardne blokovať.
           if (String(job.mechanicId) === String(mechId) && String(job.date) === String(dateVal) && job.status !== 'Zrušené') {
             bookedIntervals.push({ start: job.startTime || '08:00', end: job.endTime || '16:00', task: job.task });
           }
